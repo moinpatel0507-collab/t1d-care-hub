@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>T1D Care Hub</title>
+<meta name="description" content="Family care hub for type 1 diabetes: food, glucose, supplies, sick days and check-ups.">
+<meta name="theme-color" content="#0f3b3d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="T1D Hub">
+<link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;font:14px/1.5 system-ui,sans-serif}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+<link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="hero-top"><span class="ring" aria-hidden="true"></span><span class="eyebrow">T1D Care Hub</span><span class="hero-date" id="heroDate"></span></div>
+    <h1 id="heroTitle">Hello</h1>
+    <p class="hero-sub" id="who">Shared between you and his mum. Glucose and insulin history stay in his CGM and pump apps.</p>
+    <div class="hero-chips" id="heroChips"></div>
+    <div class="hero-ring" id="heroRing" aria-hidden="true"></div>
+  </header>
+
+  <div id="dbNote" class="notice" hidden></div>
+
+  <nav id="nav" aria-label="Sections">
+    <a href="#today" class="pri"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></svg><span>Today</span></a>
+    <a href="#glucose" class="pri"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c3 4.5 6 7.6 6 11a6 6 0 0 1-12 0c0-3.4 3-6.5 6-11z"/></svg><span>Glucose</span></a>
+    <a href="#food" class="pri"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18M4.5 3v5a2.5 2.5 0 0 0 5 0V3M18 21V3c-2.2 0-3.5 3-3.5 7h3.5"/></svg><span>Food</span></a>
+    <a href="#log" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg><span>History</span></a>
+    <a href="#supplies" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5l9-4.5 9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></svg><span>Supplies</span></a>
+    <a href="#checks" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11M10 20V5M16 20v-6M2 20h20"/><path d="M20 4v6M17 7h6"/></svg><span>Growth</span></a>
+    <a href="#sick" class="pri"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 17.5v-6"/></svg><span>Sick day</span></a>
+    <a href="#plan" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zM9 11h6M9 15h4"/></svg><span>Care plan</span></a>
+    <a href="#backup" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg><span>Backup</span></a>
+    <button type="button" id="moreBtn" class="more" aria-expanded="false" aria-controls="moreSheet"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg><span>More</span></button>
+  </nav>
+  <div id="moreSheet" class="sheet" hidden>
+    <div class="sheet-in">
+      <a href="#log"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg><span>History</span></a>
+      <a href="#supplies"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5l9-4.5 9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></svg><span>Supplies</span></a>
+      <a href="#checks"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11M10 20V5M16 20v-6M2 20h20"/><path d="M20 4v6M17 7h6"/></svg><span>Growth</span></a>
+      <a href="#plan"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zM9 11h6M9 15h4"/></svg><span>Care plan</span></a>
+      <a href="#backup"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg><span>Backup</span></a>
+    </div>
+  </div>
+
+  <!-- TODAY -->
+  <section id="v-today" class="view" hidden>
+    <div class="strip" id="strip"></div>
+    <div class="panel" id="comingPanel">
+      <div><h2>Coming days</h2><div class="muted">What's due this week, and the times his past data says to keep an eye on. Patterns from the last 14 days, not predictions.</div></div>
+      <div class="twochart"><div class="mpcard"><h3>Coming up</h3><ul class="agenda" id="agenda"></ul></div><div class="mpcard"><h3>Be ready for</h3><ul class="plain" id="watchList"></ul></div></div>
+    </div>
+    <div class="cols">
+    <div class="panel">
+      <div><h2>Log something</h2><div class="muted">Tap what just happened. The time fills in for you.</div></div>
+      <div class="qgrid">
+        <button class="qt t-food" data-q="food"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18M4.5 3v5a2.5 2.5 0 0 0 5 0V3M18 21V3c-2.2 0-3.5 3-3.5 7h3.5"/></svg></span><span class="ql">Food</span><span class="qs">Meal or snack</span></button>
+        <button class="qt t-drink" data-q="drink"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12l-1.6 16.2a1 1 0 0 1-1 .8H8.6a1 1 0 0 1-1-.8z"/><path d="M6.6 10h10.8"/></svg></span><span class="ql">Drink</span><span class="qs">Milk, water, juice</span></button>
+        <button class="qt t-low" data-q="hypo"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15M6 13l6 6 6-6"/></svg></span><span class="ql">Hypo treated</span><span class="qs">Low and what you gave</span></button>
+        <button class="qt t-high" data-q="high"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M6 11l6-6 6 6"/></svg></span><span class="ql">High</span><span class="qs">Correction or high note</span></button>
+        <button class="qt t-ket" data-q="ketones"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6M10 3v6l-5.2 9.1A2 2 0 0 0 6.5 21h11a2 2 0 0 0 1.7-2.9L14 9V3"/><path d="M7 15h10"/></svg></span><span class="ql">Ketones</span><span class="qs">Blood ketone check</span></button>
+        <button class="qt t-blue" data-q="site"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></span><span class="ql">Site change</span><span class="qs">New pod or infusion set</span></button>
+        <button class="qt t-blue" data-q="sensor"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><path d="M12 4v2M12 18v2M4 12h2M18 12h2"/></svg></span><span class="ql">Sensor change</span><span class="qs">New CGM sensor</span></button>
+        <button class="qt t-high" data-q="ill"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z"/></svg></span><span class="ql">Unwell</span><span class="qs">Illness or temperature</span></button>
+        <button class="qt t-grey" data-q="activity"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></span><span class="ql">Activity</span><span class="qs">Play, swimming, park</span></button>
+        <button class="qt t-grey" data-q="note"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/></svg></span><span class="ql">Note</span><span class="qs">Question for clinic</span></button>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Recent</h2>
+      <ul class="log" id="recent"></ul>
+    </div>
+    </div>
+  </section>
+
+  <!-- LOG -->
+  <section id="v-log" class="view" hidden>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end">
+        <div><h2>Event log</h2><div class="muted">What the CGM and pump can't record: what happened, why, and what you did.</div></div>
+        <div class="btns">
+          <select id="range" aria-label="Range"><option value="7">Last 7 days</option><option value="14" selected>Last 14 days</option><option value="30">Last 30 days</option><option value="60">Last 60 days</option></select>
+          <select id="filter" aria-label="Type"><option value="">All types</option></select>
+        </div>
+      </div>
+      <ul class="log" id="fullLog"></ul>
+    </div>
+    <div class="panel">
+      <h2>Clinic summary</h2>
+      <div class="muted">Copy this into an email or read it out at the appointment, alongside his Clarity / Glooko / LibreView report.</div>
+      <pre class="handover" id="clinicText"></pre>
+      <div class="btns"><button class="primary" id="copyClinic">Copy summary</button></div>
+    </div>
+  </section>
+
+  <!-- SUPPLIES -->
+  <section id="v-supplies" class="view" hidden>
+    <div class="panel">
+      <div><h2>Supplies</h2><div class="muted">Days left = stock × days each unit lasts. Linked items count down when you log a site or sensor change.</div></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Item</th><th>In stock</th><th>Days left</th><th>Status</th><th></th></tr></thead>
+        <tbody id="supTable"></tbody>
+      </table></div>
+      <div class="btns"><button class="primary" id="addSup">Add item</button><button id="starterSup">Add common pump + CGM items</button></div>
+    </div>
+  </section>
+
+  <!-- GLUCOSE -->
+  <section id="v-glucose" class="view" hidden>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end">
+        <div><h2>His glucose</h2><div class="muted" id="gSince">Import a file from his CGM, pump or meter (CSV, Excel, PDF, JSON or zip) to see his graphs here, with meals and events on top.</div></div>
+        <div class="btns">
+          <select id="gRange" aria-label="Period"><option value="7">Last 7 days</option><option value="14" selected>Last 14 days</option><option value="30">Last 30 days</option></select>
+          <label class="btn" for="gFile" style="display:inline-block;font-weight:700">Import glucose file<input id="gFile" type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm,.ods,.json,.zip,.pdf" hidden></label>
+        </div>
+      </div>
+      <div id="gStatus" class="notice" hidden></div>
+      <div id="gMap" class="mapper" hidden></div>
+      <details>
+        <summary style="cursor:pointer;font-weight:700">How to get the file</summary>
+        <ul class="plain" style="margin-top:8px">
+          <li><strong>Omnipod 5 / Glooko:</strong> sign in at my.glooko.com on a computer and choose <em>Export to CSV</em>. You get a .zip file. Import the .zip as it is.</li>
+          <li><strong>Dexcom:</strong> sign in at clarity.dexcom.eu, click the export icon (top right), pick the dates and export. Import the .csv.</li>
+          <li><strong>Medtronic (MiniMed 780G, Guardian sensor):</strong> sign in at carelink.minimed.eu on a computer, open <em>Reports</em>, choose <em>Data export (CSV)</em>, pick the dates and export. Import the .csv.</li>
+          <li><strong>Libre:</strong> sign in at libreview.com, open <em>Glucose History</em> and choose <em>Download glucose data</em>. Import the .csv.</li>
+          <li><strong>Any other app, meter or spreadsheet:</strong> export or save it as CSV, Excel (.xlsx) or JSON. If I don't recognise the columns, you'll be asked to pick the date and glucose columns.</li>
+          <li><strong>PDF reports:</strong> import them too. Logbook or daily-detail PDFs that list readings with times work best. You'll see the readings to check before anything is saved. Summary PDFs that only show graphs and averages have no readings in them to import.</li>
+          <li>Import every week or two. New files merge with what's already here, so overlapping dates are fine.</li>
+        </ul>
+      </details>
+    </div>
+    <div class="strip" id="gStats" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))"></div>
+    <div class="panel">
+      <div><h2>Time in range</h2><div class="muted">How much of the day his glucose was low, in range (3.9–10.0) or high.</div></div>
+      <div id="tirBar"></div>
+    </div>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+        <div><h2>One day</h2><div class="muted">His glucose line with meals, drinks and events underneath. Hover or tap the chart for details.</div></div>
+        <div class="btns" style="align-items:center"><button class="small" id="dPrev" aria-label="Previous day">‹ Prev</button><input id="dDate" type="date" style="width:auto"><button class="small" id="dNext" aria-label="Next day">Next ›</button></div>
+      </div>
+      <div class="chartbox" id="dayChart"></div>
+      <div class="legendrow">
+        <span><i class="lg line"></i>Glucose (CGM)</span><span><i class="lg dot"></i>Finger prick / logged reading</span>
+        <span><i class="lg food"></i>Food (carbs)</span><span><i class="lg drink"></i>Drink</span><span><i class="lg hypo"></i>Hypo treated</span><span><i class="lg evt"></i>Other event</span>
+      </div>
+    </div>
+    <div class="panel">
+      <div><h2>His typical day</h2><div class="muted">All the days in the period stacked on top of each other. The dark line is the middle value at each time of day. The shaded areas show how much it varies from day to day.</div></div>
+      <div class="chartbox" id="agpChart"></div>
+    </div>
+    <div class="panel">
+      <h2>What this means</h2>
+      <ul class="plain" id="gInsights"></ul>
+      <p class="notice">These are patterns to discuss with his diabetes team. Don't change his pump settings because of this page alone.</p>
+    </div>
+  </section>
+
+  <!-- FOOD -->
+  <section id="v-food" class="view" hidden>
+    <div class="strip" id="foodStrip"></div>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end">
+        <div><h2>Today</h2><div class="muted">Carbs he actually ate, and what he drank.</div></div>
+        <div class="btns"><button class="primary" data-q2="food">Add food</button><button class="primary" data-q2="drink">Add drink</button></div>
+      </div>
+      <div id="foodToday"></div>
+    </div>
+    <div class="panel">
+      <h2>Last 7 days</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Day</th><th>Meals &amp; snacks</th><th style="text-align:right">Carbs eaten</th><th style="text-align:right">Drinks</th></tr></thead>
+        <tbody id="foodWeek"></tbody>
+      </table></div>
+    </div>
+    <div class="panel" id="mealPanel">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end">
+        <div><h2>Meal patterns</h2><div class="muted">How his glucose behaved after each of his regular meals, up to the next meal. A high or low counts when it lasts 15 minutes or more.</div></div>
+        <select id="mpRange" aria-label="Period"><option value="14">Last 14 days</option><option value="30" selected>Last 30 days</option><option value="60">Last 60 days</option></select>
+      </div>
+      <div id="mealPatterns"></div>
+      <p class="notice">This shows what happened. It isn't advice on what to feed him. Don't cut his carbs without his diabetes team: he needs them to grow. Take the questions below to his dietitian.</p>
+    </div>
+  </section>
+
+  <!-- GROWTH & CHECKS -->
+  <section id="v-checks" class="view" hidden>
+    <div class="strip" id="cStrip"></div>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end">
+        <div><h2>Height and weight</h2><div class="muted">Add a measurement after each clinic visit or health visitor check.</div></div>
+        <button class="primary" id="addGrowth">Add measurement</button>
+      </div>
+      <div class="twochart">
+        <div><h3>Height <span class="muted" style="font-weight:400">cm</span></h3><div class="chartbox small" id="hChart"></div></div>
+        <div><h3>Weight <span class="muted" style="font-weight:400">kg</span></h3><div class="chartbox small" id="wChart"></div></div>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th style="text-align:right">Height</th><th style="text-align:right">Weight</th><th>Notes</th><th></th></tr></thead>
+        <tbody id="gTable"></tbody>
+      </table></div>
+    </div>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end">
+        <div><h2>Eye and dental check-ups</h2><div class="muted">Next due date is worked out from the last visit, unless the optician or dentist gave you a date.</div></div>
+        <button class="primary" id="addCheck">Add check-up</button>
+      </div>
+      <div class="twochart" id="checkCols"></div>
+    </div>
+  </section>
+
+  <!-- SICK DAY -->
+  <section id="v-sick" class="view" hidden>
+    <div class="panel">
+      <h2>Ketone check</h2>
+      <div class="grid2">
+        <label>Blood ketones <small>mmol/L</small><input id="ketIn" type="number" step="0.1" min="0" inputmode="decimal" placeholder="e.g. 0.8"></label>
+        <label>Glucose <small>mmol/L (optional)</small><input id="glIn" type="number" step="0.1" min="0" inputmode="decimal" placeholder="e.g. 16.2"></label>
+      </div>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" id="vomIn" style="width:auto"> Vomiting, drowsy, fast or deep breathing, or tummy pain</label>
+      <div id="ketOut"></div>
+      <div class="btns"><button class="q-ket" id="logKet">Log this check</button></div>
+    </div>
+    <div class="panel">
+      <h2>Sick-day rules (general UK guidance)</h2>
+      <p class="notice">Your diabetes team's written sick-day plan comes first. Use this page as a reminder, not instead of it.</p>
+      <ul class="plain">
+        <li><strong>Never stop insulin.</strong> He still needs basal insulin even if he isn't eating.</li>
+        <li>Check glucose (CGM plus a finger prick if it doesn't match how he seems) and <strong>blood ketones every 2 hours</strong> while unwell or when glucose stays high.</li>
+        <li><strong>Pump:</strong> high glucose with ketones of 0.6 or more can mean the cannula or pod has failed. Follow your team's plan: usually a correction by pen, then a new site.</li>
+        <li>Keep him drinking small sips often. Sugar-free fluids if glucose is high, sugary ones if it's low and he won't eat.</li>
+        <li>Phone the diabetes team early. Young children become dehydrated and unwell faster than older children.</li>
+      </ul>
+      <div class="band urgent"><strong>Go to A&amp;E or call 999 if</strong>
+        <span>ketones are 3.0 or more · he is vomiting and ketones are raised · he is drowsy, confused, breathing fast or deeply, or has tummy pain · you can't reach the team and you are worried.</span></div>
+      <div id="sickContacts"></div>
+    </div>
+  </section>
+
+  <!-- PLAN -->
+  <section id="v-plan" class="view" hidden>
+    <form class="panel" id="planForm">
+      <div><h2>Care plan</h2><div class="muted">Copy these from the plan his diabetes team gave you. Leave anything blank you don't have yet.</div></div>
+      <div class="grid2">
+        <label>Child's first name<input id="p_name" autocomplete="off"></label>
+        <label>Date of birth<input id="p_dob" type="date"></label>
+        <label>CGM<input id="p_cgm" placeholder="e.g. Dexcom G7"></label>
+        <label>Pump<input id="p_pump" list="pumpList" placeholder="Pick or type, e.g. Medtronic MiniMed 780G"></label>
+        <datalist id="pumpList"><option value="Medtronic MiniMed 780G"></option><option value="Medtronic MiniMed 640G"></option><option value="Omnipod 5"></option><option value="Omnipod DASH"></option><option value="Tandem t:slim X2"></option><option value="Ypsomed mylife YpsoPump"></option><option value="Medtrum TouchCare Nano"></option></datalist>
+        <label>Hypo below <small>mmol/L</small><input id="p_hypo" type="number" step="0.1" placeholder="4.0"></label>
+        <label>Check ketones above <small>mmol/L</small><input id="p_ketAbove" type="number" step="0.1" placeholder="14.0"></label>
+        <label>Pod / infusion set lasts <small>days</small><input id="p_siteDays" type="number" step="0.5" placeholder="3"></label>
+        <label>Sensor lasts <small>days</small><input id="p_sensorDays" type="number" step="0.5" placeholder="10"></label>
+        <label>Eye check every <small>months</small><input id="p_eyeMonths" type="number" step="1" min="1" placeholder="12"></label>
+        <label>Dental check every <small>months</small><input id="p_dentalMonths" type="number" step="1" min="1" placeholder="6"></label>
+      </div>
+      <label>Hypo treatment <small>exactly what his team says: what, how much, when to recheck</small><textarea id="p_hypoTx" placeholder="e.g. … then recheck in 15 minutes"></textarea></label>
+      <label>High glucose plan<textarea id="p_highTx"></textarea></label>
+      <label>Signs he's low <small>how he shows it (toddlers often can't say)</small><textarea id="p_signs" placeholder="e.g. grizzly, pale, clingy, sweaty"></textarea></label>
+      <label>Emergency: glucagon <small>where it is, who is trained</small><input id="p_glucagon"></label>
+      <div class="grid2">
+        <label>Diabetes team (daytime)<input id="p_teamDay" inputmode="tel"></label>
+        <label>Diabetes team (out of hours)<input id="p_teamOoh" inputmode="tel"></label>
+      </div>
+      <label>Notes for the two of you<textarea id="p_notes"></textarea></label>
+      <div class="btns"><button class="primary" type="submit" id="savePlan">Save care plan</button></div>
+    </form>
+  </section>
+
+  <!-- BACKUP -->
+  <section id="v-backup" class="view" hidden>
+    <div class="panel" id="backupPanel">
+      <div><h2>Backup and restore</h2><div class="muted">Save everything (log, food, glucose data, growth, check-ups, supplies and care plan) as one file on your phone or computer. Keep a copy somewhere safe, like email or Google Drive.</div></div>
+      <div class="strip" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+        <div class="stat" id="bkLast"><span class="k">Last backup</span><span class="v">—</span><span class="n">Never</span></div>
+        <div class="stat"><span class="k">Saved items</span><span class="v" id="bkCount">—</span><span class="n">Entries, days of CGM, records</span></div>
+      </div>
+      <div class="btns"><button class="primary" id="bkExport" type="button">Download backup</button><label class="btn" for="bkFile" style="display:inline-block">Restore from backup<input id="bkFile" type="file" accept=".json,application/json" hidden></label></div>
+      <div id="bkStatus" class="notice" hidden></div>
+      <div id="bkConfirm" class="band high" hidden></div>
+    </div>
+    <div class="panel"><h2>How restore works</h2><ul class="plain"><li><strong>Download backup</strong> saves one file with everything: log, food, glucose data, growth, check-ups, supplies and care plan.</li><li><strong>Restore from backup</strong> shows what's in the file and asks before changing anything. It adds back anything missing and resets matching items to the backup. It never deletes entries you've added since.</li><li>Use it to move from the test HTML file to the family app, to a new phone, or to recover after a mistake.</li></ul></div>
+  </section>
+</div>
+
+<dialog id="dlg">
+  <form id="entryForm" method="dialog">
+    <h2 id="dlgTitle">Log</h2>
+    <div class="grid2">
+      <label>When<input id="e_at" type="datetime-local" required></label>
+      <label>Type<select id="e_type"></select></label>
+      <label>Glucose <small>mmol/L</small><input id="e_gl" type="number" step="0.1" min="0" inputmode="decimal"></label>
+      <label>Ketones <small>mmol/L</small><input id="e_ket" type="number" step="0.1" min="0" inputmode="decimal"></label>
+      <label data-for="food" hidden>Meal<select id="e_meal"><option>Breakfast</option><option>Morning snack</option><option>Lunch</option><option>Afternoon snack</option><option>Dinner</option><option>Bedtime snack</option></select></label>
+      <label data-for="food drink" hidden><span id="e_itemLabel">What he had</span><input id="e_item" list="itemList" autocomplete="off" placeholder="e.g. Weetabix + whole milk"></label>
+      <label data-for="food" hidden>How much he ate<select id="e_ate"><option>All</option><option>Most</option><option>Half</option><option>A little</option><option>Refused</option></select></label>
+      <label data-for="drink" hidden>Amount <small>ml</small><input id="e_ml" type="number" step="10" min="0" inputmode="numeric"></label>
+      <label><span id="e_carbsLabel">Carbs <small>g</small></span><input id="e_carbs" type="number" step="1" min="0" inputmode="numeric"></label>
+    </div>
+    <datalist id="itemList"></datalist>
+    <label><span id="e_noteLabel">What happened / what you did</span><textarea id="e_note"></textarea></label>
+    <div class="btns" style="justify-content:flex-end"><button type="button" id="dlgCancel">Cancel</button><button class="primary" type="submit" id="dlgSave">Save</button></div>
+  </form>
+</dialog>
+
+<dialog id="growDlg">
+  <form id="growForm" method="dialog">
+    <h2>Height and weight</h2>
+    <div class="grid2">
+      <label>Date<input id="g_date" type="date" required></label>
+      <label>Height <small>cm</small><input id="g_h" type="number" step="0.1" min="30" max="200" inputmode="decimal"></label>
+      <label>Weight <small>kg</small><input id="g_w" type="number" step="0.01" min="2" max="150" inputmode="decimal"></label>
+    </div>
+    <label>Notes <small>e.g. measured at clinic</small><input id="g_note"></label>
+    <div class="btns" style="justify-content:flex-end"><button type="button" id="growCancel">Cancel</button><button class="primary" type="submit">Save</button></div>
+  </form>
+</dialog>
+
+<dialog id="chkDlg">
+  <form id="chkForm" method="dialog">
+    <h2>Check-up</h2>
+    <div class="grid2">
+      <label>Type<select id="c_kind"><option value="eye">Eye check</option><option value="dental">Dental check</option></select></label>
+      <label>Date<input id="c_date" type="date" required></label>
+      <label>Where / who<input id="c_where" placeholder="e.g. Specsavers Stratford"></label>
+      <label>Next due <small>leave blank to use the usual gap</small><input id="c_next" type="date"></label>
+    </div>
+    <label>Result / notes<textarea id="c_note" placeholder="e.g. all fine, no fillings needed"></textarea></label>
+    <div class="btns" style="justify-content:flex-end"><button type="button" id="chkCancel">Cancel</button><button class="primary" type="submit">Save</button></div>
+  </form>
+</dialog>
+
+<dialog id="supDlg">
+  <form id="supForm" method="dialog">
+    <h2>Supply item</h2>
+    <div class="grid2">
+      <label>Item<input id="s_name" required placeholder="e.g. Omnipod pods"></label>
+      <label>In stock <small>units</small><input id="s_qty" type="number" min="0" step="1" required></label>
+      <label>Each unit lasts <small>days</small><input id="s_days" type="number" min="0.1" step="0.1" required></label>
+      <label>Reorder when <small>days left</small><input id="s_lead" type="number" min="0" step="1" value="14"></label>
+      <label>Counts down on<select id="s_link"><option value="">Nothing (update by hand)</option><option value="site">Site / pod change</option><option value="sensor">Sensor change</option></select></label>
+    </div>
+    <div class="btns" style="justify-content:flex-end"><button type="button" id="supCancel">Cancel</button><button class="primary" type="submit">Save item</button></div>
+  </form>
+</dialog>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
