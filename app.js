@@ -1,4 +1,4 @@
-// Lumo — app logic (generated from the master page)
+// T1D Care Hub — app logic (generated from the master page)
 // JSZip, XLSX and pdfjsLib are loaded by <script> tags in index.html
 
 (() => {
@@ -966,7 +966,7 @@ function icsFor(a){
   const end = a.hasTime ? `DURATION:PT45M` : `DTEND;VALUE=DATE:${dt(new Date(a.at+864e5))}`;
   const title = `${P("name")||"Son"}: ${(AK[a.kind]||AK.other).label}${a.vaccine?" ("+a.vaccine+")":""}`;
   const esc2 = t => String(t||"").replace(/[\\,;]/g, m=>"\\"+m).replace(/\n/g,"\\n");
-  return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Lumo//EN","BEGIN:VEVENT",`UID:${a.id}@t1d-care-hub`,`DTSTAMP:${new Date().toISOString().replace(/[-:]/g,"").slice(0,15)}Z`,start,end,
+  return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//T1D Care Hub//EN","BEGIN:VEVENT",`UID:${a.id}@t1d-care-hub`,`DTSTAMP:${new Date().toISOString().replace(/[-:]/g,"").slice(0,15)}Z`,start,end,
     `SUMMARY:${esc2(title)}`, a.where?`LOCATION:${esc2(a.where)}`:"", `DESCRIPTION:${esc2([a.who?"With: "+a.who:"", a.notes?"To ask: "+a.notes:""].filter(Boolean).join("\n"))}`,
     "BEGIN:VALARM","TRIGGER:-P1D","ACTION:DISPLAY","DESCRIPTION:Tomorrow: "+esc2(title),"END:VALARM",
     ...(a.hasTime?["BEGIN:VALARM","TRIGGER:-PT2H","ACTION:DISPLAY","DESCRIPTION:In 2 hours: "+esc2(title),"END:VALARM"]:[]),
@@ -1061,7 +1061,7 @@ function buildReport(){
   else hi.push(`No CGM data for this period yet. Import his CareLink file on the Glucose tab to fill in the glucose part of this report.`);
   if(refused) hi.push(`He refused or barely ate <b>${refused}</b> meal${refused===1?"":"s"}.`);
   if(L.some(e=>e.type==="ill")) hi.push(`He was unwell on ${new Set(L.filter(e=>e.type==="ill").map(e=>ymd(e.at))).size} day(s) in this period.`);
-  return `<div class="rp-head"><div><div class="rp-eyebrow">Lumo · report for the family</div><h1>${esc(title)}</h1><div class="rp-sub">${fmtR(a)} – ${fmtR(Math.min(b, Date.now()))}${P("pump")?` · ${esc(P("pump"))}`:""}${P("cgm")?` + ${esc(P("cgm"))}`:""}</div></div><div class="rp-ring"><b>${st?Math.round(st.tir)+"%":"–"}</b><span>in range</span></div></div>
+  return `<div class="rp-head"><div><div class="rp-eyebrow">T1D Care Hub · report for the family</div><h1>${esc(title)}</h1><div class="rp-sub">${fmtR(a)} – ${fmtR(Math.min(b, Date.now()))}${P("pump")?` · ${esc(P("pump"))}`:""}${P("cgm")?` + ${esc(P("cgm"))}`:""}</div></div><div class="rp-ring"><b>${st?Math.round(st.tir)+"%":"–"}</b><span>in range</span></div></div>
   <div class="rp-cards">
     ${card("Time in range", st?Math.round(st.tir)+"%":"–", "target over 70%", st&&sp?arrow(st.tir, sp.tir, true):"")}
     ${card("Average glucose", st?st.mean.toFixed(1):"–", "mmol/L", st&&sp?arrow(st.mean, sp.mean, false):"")}
@@ -1085,7 +1085,7 @@ function buildReport(){
     <div><h2>Coming up</h2>${upcoming.length?`<ul class="rp-list">${upcoming.map(x=>`<li><b>${new Date(x.at).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})}</b> · ${esc((AK[x.kind]||AK.other).label)}${x.vaccine?" ("+esc(x.vaccine)+")":""}${x.where?" · "+esc(x.where):""}</li>`).join("")}</ul>`:`<p class="rp-muted">No appointments in the next 30 days.</p>`}</div>
     <div><h2>Supplies</h2><ul class="rp-list">${nd?`<li>Next delivery <b>${fmtR(nd)}</b></li>`:""}${toOrder.length?toOrder.map(x=>`<li><b>${esc(x.name)}</b> · ${Math.floor(x.left)} days left</li>`).join(""):`<li>Nothing needs ordering.</li>`}</ul></div>
   </div>
-  <div class="rp-foot">Made with Lumo on ${fmtR(Date.now())}. This shows what happened; talk to his diabetes team before changing his pump settings.</div>`;
+  <div class="rp-foot">Made with T1D Care Hub on ${fmtR(Date.now())}. This shows what happened; talk to his diabetes team before changing his pump settings.</div>`;
 }
 function renderReport(){ const el=$("#reportView"); if(!el || $("#v-reports").hidden) return; el.innerHTML = buildReport(); }
 ["#rpPeriod","#rpFrom","#rpTo"].forEach(id => $(id).addEventListener("change", renderReport));
@@ -1115,7 +1115,7 @@ $("#rpPdf").addEventListener("click", async e => {
       if(page++) pdf.addPage(); pdf.addImage(c.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, pw, c.height*pw/canvas.width); y += sliceH; }
     const blob = pdf.output("blob"); const [a] = rpRange();
     const d = await getDownloads(); if(!d) throw Object.assign(new Error("Saving files isn't available here"),{code:"unavailable"});
-    const r = await d.save({filename:`Lumo-report-${ymd(a)}.pdf`, data: blob}); msg.textContent = r.status==="saved" ? "PDF saved." : "";
+    const r = await d.save({filename:`T1D-report-${ymd(a)}.pdf`, data: blob}); msg.textContent = r.status==="saved" ? "PDF saved." : "";
   } catch(err){ msg.textContent = err.code==="declined" ? "Cancelled." : err.message==="load" ? "Couldn't load the PDF maker. Check your internet connection." : (err.message || "Couldn't make the PDF."); }
   finally { btn.disabled=false; }
 });
@@ -1330,7 +1330,7 @@ $("#bkExport").addEventListener("click", async e => {
     const out = {app:"t1d-care-hub", version:1, exportedAt:new Date().toISOString(), plan:(await base.get()).data()||{}};
     for(const c of BK_COLS){ const snap = await base.collection(c).get(); out[c] = snap.docs.map(d=>({id:d.id, ...d.data()})); }
     const nm = (plan.name||"son").trim().replace(/[^A-Za-z0-9]+/g,"-") || "son";
-    const r = await dl.save({filename:`Lumo-backup-${nm}-${ymd(Date.now())}.json`, data:JSON.stringify(out)});
+    const r = await dl.save({filename:`T1D-backup-${nm}-${ymd(Date.now())}.json`, data:JSON.stringify(out)});
     if(r.status==="saved"){ await base.collection("meta").doc("backup").set({at:Date.now(), by:me}); bkStatus(`Backup saved: ${out.log.length} log entries, ${out.cgm.length} days of CGM, ${out.growth.length} measurements, ${out.checks.length} check-ups, ${out.supplies.length} supplies.`); }
     else bkStatus("");
   } catch(err){ bkStatus(err.code==="declined" ? "Backup cancelled." : err.code==="rate_limited" ? "A save prompt is already open. Finish that one first." : "Couldn't make the backup. Try again."); }
@@ -1350,7 +1350,7 @@ $("#bkFile").addEventListener("change", async ev => {
     }
     if(isEncrypted(bytes)) return askBackupPassword(bytes);
     openRestore(JSON.parse(new TextDecoder().decode(bytes)));
-  } catch { bkStatus("That file isn't a Lumo backup."); }
+  } catch { bkStatus("That file isn't a T1D Care Hub backup."); }
 });
 /* daily GitHub backups are locked with your backup password (openssl AES-256-CBC, PBKDF2-SHA256) */
 const isEncrypted = b => b.length>16 && String.fromCharCode(...b.slice(0,8))==="Salted__";
@@ -1373,7 +1373,7 @@ function askBackupPassword(bytes){
 }
 function openRestore(data){
   {
-    if(data.app!=="t1d-care-hub" || !Array.isArray(data.log)) return bkStatus("That file isn't a Lumo backup.");
+    if(data.app!=="t1d-care-hub" || !Array.isArray(data.log)) return bkStatus("That file isn't a T1D Care Hub backup.");
     pendingRestore = data;
     const c = $("#bkConfirm"); c.hidden=false;
     c.innerHTML = `<strong>Restore backup from ${fmtD(Date.parse(data.exportedAt))}?</strong><span>It has ${data.log.length} log entries, ${(data.cgm||[]).length} days of CGM, ${(data.growth||[]).length} measurements, ${(data.checks||[]).length} check-ups and ${(data.supplies||[]).length} supplies. Anything missing here is added back and matching items are reset to the backup. Nothing else is deleted.</span><div class="btns"><button class="primary" type="button" id="bkGo">Restore now</button><button type="button" id="bkNo">Cancel</button></div>`;

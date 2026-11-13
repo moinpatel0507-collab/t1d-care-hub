@@ -1,6 +1,6 @@
 {
-  "name": "Lumo",
-  "short_name": "Lumo",
+  "name": "T1D Care Hub",
+  "short_name": "T1D Hub",
   "description": "Family care hub for type 1 diabetes",
   "start_url": "/",
   "scope": "/",

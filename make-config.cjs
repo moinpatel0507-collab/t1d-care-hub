@@ -15,4 +15,4 @@ let base = url; try { base = new URL(url).origin; } catch {}   // keep only http
 if (base !== url.replace(/\/$/, '')) console.warn('\n*** NOTE: VITE_SUPABASE_URL had extra text after the address. Using ' + base + ' ***\n');
 fs.writeFileSync('dist/config.js', 'window.T1D_CONFIG = ' + JSON.stringify({ url: base, key }) + ';\n');
 fs.writeFileSync('dist/sw.js', fs.readFileSync('sw.js', 'utf8').replace('__VERSION__', Date.now().toString(36)));
-console.log('Lumo built OK: ' + files.length + ' files + config.js' + (url ? ' (database: ' + url + ')' : ''));
+console.log('T1D Care Hub built OK: ' + files.length + ' files + config.js' + (url ? ' (database: ' + url + ')' : ''));
