@@ -1,12 +1,12 @@
 // Backend for the family app: Supabase login, family membership and a small
 // document store that mimics the API the app was written against
 // (db.doc / db.collection / onSnapshot), so app.js needs almost no changes.
-import { createClient } from '@supabase/supabase-js';
+const { createClient } = window.supabase || {};
 
 const RECOVERY = /type=recovery/.test(location.hash);   // opened from a 'reset password' email
-const URL = import.meta.env.VITE_SUPABASE_URL;
-const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-export const supabase = URL && KEY ? createClient(URL, KEY, { auth: { persistSession: true, autoRefreshToken: true } }) : null;
+const URL = (window.T1D_CONFIG || {}).url;
+const KEY = (window.T1D_CONFIG || {}).key;
+export const supabase = URL && KEY && createClient ? createClient(URL, KEY, { auth: { persistSession: true, autoRefreshToken: true } }) : null;
 
 const ROOT = 'family/t1d';           // path prefix the app uses
 let familyId = null, me = null, members = [], family = null;
@@ -272,7 +272,7 @@ function addFamilyPanel() {
 }
 
 if (!supabase) {
-  screen(`<h1>Almost there</h1><p class="muted">This copy of the app isn't connected to a database yet. Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> (see README step 3), then rebuild.</p>`);
+  screen(`<h1>Almost there</h1><p class="muted">This copy of the app isn't connected to its database yet. In Vercel, check that <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> are set under Settings → Environment Variables, then redeploy.</p>`);
 } else {
   supabase.auth.onAuthStateChange((event) => { if (event === 'PASSWORD_RECOVERY') { recovering = true; return showNewPassword(); } if (event === 'SIGNED_IN' && !started && !recovering) start(); if (event === 'SIGNED_OUT') { location.reload(); } });
   start();

@@ -1,12 +1,5 @@
 // T1D Care Hub — app logic (generated from the master page)
-import JSZip from 'jszip';
-import * as XLSX from 'xlsx';
-import * as pdfjsLib from 'pdfjs-dist/build/pdf.min.js';
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
-window.JSZip = JSZip;
-window.XLSX = XLSX;
-window.pdfjsLib = pdfjsLib.getDocument ? pdfjsLib : pdfjsLib.default;
-window.PDF_WORKER_SRC = pdfWorker;
+// JSZip, XLSX and pdfjsLib are loaded by <script> tags in index.html
 
 (() => {
 const TYPES = {
