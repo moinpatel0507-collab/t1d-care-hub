@@ -334,6 +334,8 @@ nav#nav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent)
 .del-row{display:grid;grid-template-columns:minmax(0,1fr) 96px;gap:10px;align-items:center;background:var(--sunk);border-radius:14px;padding:10px 12px;font-weight:400}
 .del-row span{display:grid;gap:2px;min-width:0} .del-row small{color:var(--muted)}
 .del-row input{background:var(--surface);text-align:right;font:600 1.05rem var(--mono)}
+.lg.pc{border-radius:50%;border:2.5px solid var(--ok);background:var(--surface)}
+.lg.ins{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:10px solid var(--accent)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
 /* ===== sign-in & family setup (family app) ===== */

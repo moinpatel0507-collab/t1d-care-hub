@@ -168,12 +168,18 @@ img{max-width:100%}
       <div class="chartbox" id="dayChart"></div>
       <div class="legendrow">
         <span><i class="lg line"></i>Glucose (CGM)</span><span><i class="lg dot"></i>Finger prick / logged reading</span>
-        <span><i class="lg food"></i>Food (carbs)</span><span><i class="lg drink"></i>Drink</span><span><i class="lg hypo"></i>Hypo treated</span><span><i class="lg evt"></i>Other event</span>
+        <span><i class="lg food"></i>Food (carbs)</span><span><i class="lg drink"></i>Drink</span><span><i class="lg hypo"></i>Hypo treated</span><span><i class="lg evt"></i>Other event</span><span><i class="lg pc"></i>Carbs in pump</span><span><i class="lg ins"></i>Insulin dose</span>
       </div>
     </div>
     <div class="panel">
       <div><h2>His typical day</h2><div class="muted">All the days in the period stacked on top of each other. The dark line is the middle value at each time of day. The shaded areas show how much it varies from day to day.</div></div>
       <div class="chartbox" id="agpChart"></div>
+    </div>
+    <div class="panel" id="fromFile">
+      <div><h2>From his pump and CGM file</h2><div class="muted">Everything else the import found: carbs entered in the pump, insulin doses, finger pricks, site changes and alerts, plus every hypo the CGM picked up.</div></div>
+      <div class="strip" id="ffStrip"></div>
+      <div><h3>Hypos detected by the CGM</h3><div class="muted" style="font-size:.85rem">Below 3.9 mmol/L for 15 minutes or more.</div></div>
+      <div class="table-wrap"><table><thead><tr><th>When</th><th style="text-align:right">Lowest</th><th style="text-align:right">How long</th><th>Before it</th></tr></thead><tbody id="hypoTable"></tbody></table></div>
     </div>
     <div class="panel">
       <h2>What this means</h2>

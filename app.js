@@ -63,7 +63,7 @@ function ketBand(k, g, vom){
 
 /* ---------- render ---------- */
 function renderHeroRing(){
-  const el=$("#heroRing"); if(!el) return; const s=last("site"), days=num(plan.siteDays)??3;
+  const el=$("#heroRing"); if(!el) return; const s=lastSite(), days=num(plan.siteDays)??3;
   const R=54, C=2*Math.PI*R; let frac=0, big="—", small="no site logged";
   if(s){ const left=(s.at+days*864e5-Date.now())/864e5; frac=Math.max(0,Math.min(1,left/days)); big = left<0 ? "Due" : left<1 ? Math.max(0,Math.round(left*24))+"h" : left.toFixed(1)+"d"; small = left<0 ? "site overdue" : "site left"; }
   const col = !s ? "var(--hero-muted)" : frac<=0 ? "#ff9b91" : frac<0.2 ? "#ffd28a" : "var(--ring)";
@@ -107,8 +107,9 @@ function renderItems(){
   $("#itemList").innerHTML = opts.map(o=>`<option value="${esc(o)}"></option>`).join("");
 }
 
+function lastSite(){ const l = last("site"), p = (typeof lastPumpSite==="function") ? lastPumpSite() : null; if(p && (!l || p > l.at)) return {at:p, fromPump:true}; return l; }
 function siteStatus(){
-  const s = last("site"); const days = num(plan.siteDays) ?? 3;
+  const s = lastSite(); const days = num(plan.siteDays) ?? 3;
   if(!s) return {v:"—", n:"No change logged", cls:""};
   const due = s.at + days*864e5, left = (due-Date.now())/36e5;
   return {v: left<0 ? "Overdue" : left<24 ? Math.round(left)+" h left" : (left/24).toFixed(1)+" d left", n:"Changed "+ago(s.at), cls: left<0 ? "bad" : left<12 ? "warn" : ""};
@@ -173,6 +174,12 @@ function renderLog(){
     `Raised ketones (0.6+): ${kets.length}` + (kets.length? ` — highest ${Math.max(...kets.map(e=>e.ket)).toFixed(1)}`:""),
     `Site/pod changes: ${cnt("site")} · Sensor changes: ${cnt("sensor")}`,
     `Unwell days logged: ${cnt("ill")}`,
+    ...(()=>{ const ev=rangePump(days), n=k=>ev.filter(e=>e.k===k), dd=Math.max(1,new Set(ev.map(e=>ymd(e.t))).size), out=[];
+      if(n(1).length) out.push(`Carbs entered in pump: about ${Math.round(n(1).reduce((a,e)=>a+e.v,0)/dd)} g a day`);
+      if(n(2).length) out.push(`Bolus insulin: about ${(n(2).reduce((a,e)=>a+e.v,0)/dd).toFixed(1)} U a day (${n(2).length} doses)`);
+      if(n(3).length) out.push(`Finger pricks: ${n(3).length}`);
+      const eps = hypoEpisodes(rangePoints(Math.min(days,30))); if(eps.length) out.push(`CGM hypos (below 3.9 for 15+ min): ${eps.length}` + (eps.length? ` — lowest ${Math.min(...eps.map(h=>h.min)).toFixed(1)}`:""));
+      return out; })(),
   ];
   const cst = cgmStats(Math.min(days,30));
   if(cst) lines.splice(3,0,`CGM (last ${Math.min(days,30)} days): in range ${Math.round(pct(cst.b.in,cst.n))}%, low ${pct(cst.b.low+cst.b.vlow,cst.n).toFixed(1)}% (very low ${pct(cst.b.vlow,cst.n).toFixed(1)}%), high ${Math.round(pct(cst.b.high+cst.b.vhigh,cst.n))}% · average ${cst.mean.toFixed(1)} mmol/L · GMI ${cst.gmiMmol} mmol/mol · CV ${Math.round(cst.cv)}% · sensor data ${Math.round(cst.coverage)}%`,``);
@@ -345,7 +352,18 @@ const isMedtronic = () => /medtronic|minimed|780g|640g/i.test(plan.pump||"");
 
 /* ================= GLUCOSE ================= */
 const MG = 18.0182;
-let cgmDays = {};            // key YYYY-MM-DD -> {day, pts:[minute, tenths, ...]}
+let cgmDays = {};
+let pumpDays = {};           // key YYYY-MM-DD -> {day, ev:[minute, kind, value, ...]}  kind: 1 carbs g, 2 insulin U, 3 finger prick mmol, 4 site change, 5 low alert, 6 high alert
+const PK = {1:"Carbs (pump)", 2:"Insulin dose", 3:"Finger prick", 4:"Site change (pump)", 5:"Low alert", 6:"High alert"};
+function dayPump(key){ const d=pumpDays[key]; if(!d) return []; const b=keyToMs(key), out=[]; for(let i=0;i<d.ev.length;i+=3) out.push({t:b+d.ev[i]*6e4, k:d.ev[i+1], v:d.ev[i+2]}); return out; }
+function rangePump(days){ const out=[]; const end=midnight(Date.now()); for(let i=0;i<days;i++) out.push(...dayPump(ymd(end-i*864e5))); return out.sort((a,b)=>a.t-b.t); }
+function hypoEpisodes(pts){ const eps=[]; let cur=null, prev=null;
+  for(const p of pts){ const gap = prev && p.t-prev.t>20*6e4;
+    if(p.v<3.9 && cur && !gap){ cur.end=p.t; if(p.v<cur.min) cur.min=p.v; }
+    else { if(cur && cur.end-cur.start>=15*6e4) eps.push(cur); cur = p.v<3.9 ? {start:p.t, end:p.t, min:p.v} : null; }
+    prev=p; }
+  if(cur && cur.end-cur.start>=15*6e4) eps.push(cur); return eps; }
+function lastPumpSite(){ let best=null; for(const k of Object.keys(pumpDays)) for(const e of dayPump(k)) if(e.k===4 && (!best || e.t>best)) best=e.t; return best; }            // key YYYY-MM-DD -> {day, pts:[minute, tenths, ...]}
 let gDay = null;             // ms of local midnight shown in the day chart
 const ymd = ms => { const d=new Date(ms); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
 const midnight = ms => { const d=new Date(ms); d.setHours(0,0,0,0); return d.getTime(); };
@@ -421,34 +439,54 @@ async function tablesFromFile(file){
 }
 
 /* find the columns by their names */
+const EXTRA = {
+  carbs: [/bwz carb input/, /carb(s)? input/, /carb value/, /carbohydrates/, /^carbs?( \(g\w*\))?$/],
+  bolus: [/bolus volume delivered/, /^(?!.*total)insulin delivered/, /rapid-acting insulin \(units\)/, /^(?!.*long)(?!.*basal).*insulin value/, /^bolus( \(u\))?$/, /^insulin( \(u\))?$/],
+  bg:    [/^bg reading/, /strip glucose/, /blood glucose input/, /^bwz bg input/, /calibration bg/, /meter glucose/, /^mbg$/],
+  site:  [/^rewind$/, /^prime type$/],
+  alert: [/^alert$/, /^alarm/, /^event subtype$/],
+};
 function detectColumns(row){
-  const low = row.map(c=>String(c).toLowerCase());
-  if(!low.some(c=>/glucose|cgm|egv|sgv|\bbg\b|reading|mmol|mg\/dl|value/.test(c))) return null;
+  const low = row.map(c=>String(c).toLowerCase().trim());
   if(low.some(c=>/^\d/.test(c)) && !low.some(c=>/[a-z]{3}/.test(c))) return null;
   const pick = res => { for(const r of res){ const k=low.findIndex(c=>r.test(c)); if(k>=0) return k; } return -1; };
-  const v = pick([/historic glucose/, /cgm glucose/, /sensor glucose/, /glucose value/, /^sgv$/, /^glucose/, /egv/, /^(?!.*scan)(?!.*bg reading)(?!.*meter).*glucose/, /mmol|mg\/dl/, /^(bg|reading|value)$/]);
-  if(v<0) return null;
+  const v = pick([/historic glucose/, /cgm glucose/, /sensor glucose/, /glucose value/, /^sgv$/, /^glucose( \(|$)/, /egv/, /^(?!.*scan)(?!.*bg reading)(?!.*meter)(?!.*input)(?!.*strip)(?!.*calibration).*glucose/, /^(mmol\/l|mg\/dl)$/, /^(reading|value)$/]);
+  const ext = {}; for(const [k,res] of Object.entries(EXTRA)){ const i = pick(res); if(i>=0 && i!==v) ext[k]=i; }
+  if(v<0 && !Object.keys(ext).length) return null;
   const dOnly = low.findIndex(c=>/^date$|^day$/.test(c)), tOnly = low.findIndex(c=>/^time$/.test(c));
   let t=-1, d=-1;
   if(dOnly>=0 && tOnly>=0){ d=dOnly; t=tOnly; } else t = pick([/device timestamp/, /^timestamp/, /timestamp/, /date.?time/, /^datestring$/, /^date$/, /^time$/, /time/, /date/]);
   if(t<0) return null;
-  return { v, t, d, e: low.findIndex(c=>/^event type$|^type$/.test(c)), unit: /mg\/dl|^sgv$/.test(low[v]) ? "mg" : /mmol/.test(low[v]) ? "mmol" : "auto" };
+  const unitOf = i => i<0 ? "auto" : /mg\/dl|^sgv$|^mbg$/.test(low[i]) ? "mg" : /mmol/.test(low[i]) ? "mmol" : "auto";
+  return { v, t, d, e: low.findIndex(c=>/^event type$|^type$/.test(c)), unit: unitOf(v), ext, bgUnit: unitOf(ext.bg ?? -1) };
 }
+let IMP_EV = null;   // collects carbs, insulin, finger pricks, site changes and alerts during an import
 function extract(rows, map, rescan){
   const pts=[]; let m = map;
   rows.forEach((r, i) => {
     if(i < (m.start||0)) return;
-    if(rescan){ const h = detectColumns(r); if(h){ m = {...h, start:0}; return; } }
-    if(m.e>=0 && r[m.e] && /[a-z]/i.test(r[m.e]) && !/egv|sgv|sensor|cgm|glucose/i.test(r[m.e])) return;
-    const v = toMmol(r[m.v], m.unit); if(v==null) return;
+    if(rescan){ const h = detectColumns(r); if(h && (h.v>=0 || Object.keys(h.ext).length) && /[a-z]{3}/i.test(r[h.t]||"")) { m = {...h, start:0}; return; } }
     const t = parseWhen(m.d>=0 ? joinDT(r[m.d], r[m.t]) : r[m.t]); if(isNaN(t)) return;
     if(t > Date.now()+864e5 || t < Date.UTC(2000,0,1)) return;
+    const et = m.e>=0 ? String(r[m.e]||"") : "";
+    if(IMP_EV && m.ext){
+      const X = m.ext, num1 = i => { const x = parseFloat(String(r[i]??"").replace(",",".")); return isNaN(x) ? null : x; };
+      if(X.carbs!=null){ const c = num1(X.carbs); if(c>0 && c<300) IMP_EV.push({t, k:1, v:Math.round(c)}); }
+      if(X.bolus!=null && !/basal/i.test(et) && !/long/i.test(X.alert!=null ? String(r[X.alert]||"") : "")){ const u = num1(X.bolus); if(u>0 && u<50) IMP_EV.push({t, k:2, v:Math.round(u*100)/100}); }
+      if(X.bg!=null){ const b = toMmol(r[X.bg], m.bgUnit); if(b!=null) IMP_EV.push({t, k:3, v:b}); }
+      if(X.site!=null){ const sv = String(r[X.site]||"").trim(); if(sv && !/^(false|0|no)$/i.test(sv) && /true|rewind|fill|yes|1/i.test(sv)) IMP_EV.push({t, k:4, v:0}); }
+      if(X.alert!=null){ const a = String(r[X.alert]||""); if(/urgent low|low/i.test(a) && !/battery|reservoir/i.test(a)) IMP_EV.push({t, k:5, v:0}); else if(/high/i.test(a)) IMP_EV.push({t, k:6, v:0}); }
+      if(/calibration|meter|fingerstick|mbg/i.test(et) && m.v>=0){ const b = toMmol(r[m.v], m.unit); if(b!=null) IMP_EV.push({t, k:3, v:b}); }
+    }
+    if(m.v<0) return;
+    if(m.e>=0 && et && /[a-z]/i.test(et) && !/egv|sgv|sensor|cgm|glucose/i.test(et)) return;
+    const v = toMmol(r[m.v], m.unit); if(v==null) return;
     pts.push({t, v});
   });
   return pts;
 }
 function autoExtract(rows){
-  for(let i=0;i<Math.min(rows.length,80);i++){ const h = detectColumns(rows[i]); if(h){ const pts = extract(rows, {...h, start:i+1}, true); if(pts.length) return pts; } }
+  for(let i=0;i<Math.min(rows.length,80);i++){ const h = detectColumns(rows[i]); if(h){ const before = IMP_EV ? IMP_EV.length : 0; const pts = extract(rows, {...h, start:i+1}, true); if(pts.length || (IMP_EV && IMP_EV.length>before)) return pts; } }
   return [];
 }
 
@@ -547,6 +585,15 @@ function showMapper(table){
   };
 }
 
+async function savePumpEvents(evs){
+  const byDay = {}; for(const e of evs){ const k=ymd(e.t); const mnt=Math.round((e.t-keyToMs(k))/6e4); (byDay[k] ||= new Map()).set(mnt+":"+e.k, [mnt, e.k, e.v]); }
+  for(const [k,m] of Object.entries(byDay)){
+    const old = pumpDays[k]?.ev || []; for(let i=0;i<old.length;i+=3){ const key = old[i]+":"+old[i+1]; if(!m.has(key)) m.set(key, [old[i], old[i+1], old[i+2]]); }
+    const flat=[]; [...m.values()].sort((a,b)=>a[0]-b[0]||a[1]-b[1]).forEach(x=>flat.push(...x));
+    await base.collection("pump").doc(k).set({day:k, ev:flat});
+  }
+  renderGlucose(); return evs.length;
+}
 async function saveReadings(pts){
   const byDay = {}; for(const p of pts){ const k=ymd(p.t); (byDay[k] ||= new Map()).set(Math.round((p.t-keyToMs(k))/6e4), Math.round(p.v*10)); }
   const keys = Object.keys(byDay).sort(); let n=0;
@@ -568,13 +615,16 @@ $("#gFile").addEventListener("change", async ev => {
   try {
     const tables = (await tablesFromFile(f)).filter(t=>t.rows.length);
     if(!tables.length){ gStatus("That file is empty."); return; }
-    let pts=[]; for(const t of tables) pts = pts.concat(autoExtract(t.rows));
+    IMP_EV = []; let pts=[]; for(const t of tables) pts = pts.concat(autoExtract(t.rows)); const evs = IMP_EV; IMP_EV = null;
     const pdfT = tables.find(t=>t.pdf);
     if(pdfT){ if(!pts.length) pts = patternExtract(pdfT.rows); gStatus("");
       if(pts.length) { confirmPdf(pts.sort((a,b)=>a.t-b.t), pdfT); return; }
       gStatus("I couldn't find readings with times and glucose values in this PDF. Summary reports (like the AGP or overview pages) only show graphs and averages. Pick the columns below if the readings are in a table, or export a CSV."); showMapper(pdfT); return; }
-    if(!pts.length){ gStatus(""); showMapper(tables.sort((a,b)=>b.rows.length-a.rows.length)[0]); return; }
-    await saveReadings(pts);
+    if(!pts.length && !evs.length){ gStatus(""); showMapper(tables.sort((a,b)=>b.rows.length-a.rows.length)[0]); return; }
+    if(pts.length) await saveReadings(pts);
+    if(evs.length){ const n = await savePumpEvents(evs); const c = k => evs.filter(e=>e.k===k).length;
+      const bits = [c(1)&&`${c(1)} carb entries`, c(2)&&`${c(2)} insulin doses`, c(3)&&`${c(3)} finger pricks`, c(4)&&`${c(4)} site changes`, c(5)+c(6)&&`${c(5)+c(6)} alerts`].filter(Boolean);
+      gStatus((pts.length ? $("#gStatus").textContent + " " : "") + `Also found ${bits.join(", ")}.`); }
   } catch(e){ gStatus(e.code==="quota_exceeded" ? "Storage is full." : (e.message || "Couldn't import that file.")); }
 });
 
@@ -618,6 +668,7 @@ function renderGlucose(){
       <div class="tirlist">${rows.map(([k,l,r,t,f])=>{const p=pct(st.b[k],st.n); const hrs=p*24/100; return `<div><span class="sw" style="background:var(--${k==="in"?"ok":k})"></span><span>${l} <span class="muted">${r} mmol/L · about ${hrs<1?Math.round(hrs*60)+" min":hrs.toFixed(1)+" h"} a day</span></span><span class="pc">${p.toFixed(p<10?1:0)}%</span><span class="tg ${f?(f(p)?"good":"bad"):""}">${t?"target "+t:""}</span></div>`;}).join("")}</div>`;
     renderAGP(st); renderInsights(st, days);
   }
+  renderFromFile(days);
   if(gDay===null) gDay = keys.length ? keyToMs(keys[keys.length-1]) : midnight(Date.now());
   $("#dDate").value = ymd(gDay);
   renderDay();
@@ -640,7 +691,8 @@ function renderDay(){
   const key = ymd(gDay), d0 = gDay, pts = dayPoints(key);
   const evs = log.filter(e => e.at>=d0 && e.at<d0+864e5).sort((a,b)=>a.at-b.at);
   const manual = evs.filter(e=>e.gl!=null);
-  const H = CH.t+CH.ph+90, laneY = CH.t+CH.ph+44;
+  const pev = dayPump(key); const pumpY = CH.t+CH.ph+92;
+  const H = CH.t+CH.ph+(pev.length?126:90), laneY = CH.t+CH.ph+44;
   let g = svgFrame(H, hourTicks());
   // food guides
   evs.filter(e=>e.type==="food").forEach(e=>{ const x=xH((e.at-d0)/36e5); g+=`<line x1="${x}" x2="${x}" y1="${CH.t}" y2="${laneY-8}" stroke="var(--ok)" stroke-opacity=".45" stroke-dasharray="2 3"/>`; });
@@ -657,6 +709,16 @@ function renderDay(){
     else if(e.type==="hypo"){ g+=`<path d="M${x} ${laneY-7} L${x+7} ${laneY+6} L${x-7} ${laneY+6} Z" fill="${c}" stroke="var(--surface)" stroke-width="2"/>`; }
     else { g+=`<rect x="${x-5}" y="${laneY-5}" width="10" height="10" rx="2" fill="${c}" stroke="var(--surface)" stroke-width="2"/>`; }
   });
+  // finger pricks from the file
+  pev.filter(e=>e.k===3).forEach(e=>{ g+=`<rect x="${xH((e.t-d0)/36e5)-4.5}" y="${yS(e.v)-4.5}" width="9" height="9" fill="var(--surface)" stroke="var(--fg)" stroke-width="2" transform="rotate(45 ${xH((e.t-d0)/36e5)} ${yS(e.v)})"/>`; });
+  if(pev.length){
+    g+=`<text x="${CH.l-6}" y="${pumpY+4}" text-anchor="end">Pump</text><line x1="${CH.l}" x2="${CH.W-CH.r}" y1="${pumpY}" y2="${pumpY}" stroke="var(--line)"/>`;
+    pev.forEach(e=>{ const x=xH((e.t-d0)/36e5);
+      if(e.k===1) g+=`<circle cx="${x}" cy="${pumpY}" r="6" fill="var(--surface)" stroke="var(--ok)" stroke-width="2.5"/><text x="${x}" y="${pumpY+21}" text-anchor="middle" style="fill:var(--ok);font-weight:700">${e.v}g</text>`;
+      else if(e.k===2) g+=`<path d="M${x-5} ${pumpY-20} L${x+5} ${pumpY-20} L${x} ${pumpY-10} Z" fill="var(--accent)" stroke="var(--surface)" stroke-width="1.5"/>`;
+      else if(e.k===4) g+=`<rect x="${x-5}" y="${pumpY-5}" width="10" height="10" rx="2" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>`;
+      else if(e.k===5||e.k===6) g+=`<circle cx="${x}" cy="${pumpY}" r="3.5" fill="${e.k===5?"var(--low)":"var(--high)"}"/>`; });
+  }
   if(!pts.length) g+=`<text x="${(CH.W+CH.l)/2}" y="${yS(12)}" text-anchor="middle" style="font-size:13px">${Object.keys(cgmDays).length?"No CGM data for this day":"No CGM data yet. Import a file above"}</text>`;
   g+=`<line id="dCross" x1="0" x2="0" y1="${CH.t}" y2="${laneY+8}" stroke="var(--fg)" stroke-opacity=".5" visibility="hidden"/><circle id="dDot" r="5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2" visibility="hidden"/>`;
   g+=`<rect id="dHit" x="${CH.l}" y="0" width="${CH.W-CH.l-CH.r}" height="${H}" fill="transparent"/>`;
@@ -666,13 +728,14 @@ function renderDay(){
     const t = d0 + (x-CH.l)/(CH.W-CH.l-CH.r)*864e5;
     let best=null; for(const p of pts) if(!best || Math.abs(p.t-t)<Math.abs(best.t-t)) best=p;
     if(best && Math.abs(best.t-t)>15*6e4) best=null;
-    const near = evs.filter(e=>Math.abs(e.at-t)<20*6e4);
-    if(!best && !near.length) return null;
-    const tt = best?best.t:near[0].at;
+    const near = evs.filter(e=>Math.abs(e.at-t)<20*6e4), pnear = pev.filter(e=>Math.abs(e.t-t)<20*6e4);
+    if(!best && !near.length && !pnear.length) return null;
+    const tt = best?best.t:near.length?near[0].at:pnear[0].t;
     return {x:xH((tt-d0)/36e5), y: best?yS(best.v):null, html:
       `<div class="muted">${new Date(tt).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})}</div>`+
       (best?`<div><b>${best.v.toFixed(1)}</b> mmol/L · ${({vlow:"very low",low:"low",in:"in range",high:"high",vhigh:"very high"})[band(best.v)]}</div>`:"")+
-      near.map(e=>`<div>${TYPES[e.type]?.label||"Note"}${e.item?": "+esc(e.item):""}${e.carbs!=null?` · ${e.carbs} g`:""}${e.ml!=null?` · ${e.ml} ml`:""}${e.gl!=null?` · ${e.gl.toFixed(1)}`:""}</div>`).join("")};
+      near.map(e=>`<div>${TYPES[e.type]?.label||"Note"}${e.item?": "+esc(e.item):""}${e.carbs!=null?` · ${e.carbs} g`:""}${e.ml!=null?` · ${e.ml} ml`:""}${e.gl!=null?` · ${e.gl.toFixed(1)}`:""}</div>`).join("")+
+      pnear.map(e=>`<div class="muted">${PK[e.k]}${e.k===1?` · ${e.v} g`:e.k===2?` · ${e.v} U`:e.k===3?` · ${e.v.toFixed(1)} mmol/L`:""}</div>`).join("")};
   });
 }
 function hover(box, H, find){
@@ -712,6 +775,30 @@ function renderAGP(st){
     return {x:xH(b.h), y:yS(b.p50), html:`<div class="muted">${lab}–${String(Math.floor((b.i+1)/2)%24).padStart(2,"0")}:${b.i%2?"00":"30"}</div><div>Usually <b>${b.p50.toFixed(1)}</b> mmol/L</div><div class="muted">Half of days ${b.p25.toFixed(1)}–${b.p75.toFixed(1)}</div><div class="muted">Range ${b.p5.toFixed(1)}–${b.p95.toFixed(1)}</div>`}; });
 }
 function valueNear(t, win){ const k=ymd(t); let best=null; for(const p of [...dayPoints(k), ...dayPoints(ymd(t-864e5)), ...dayPoints(ymd(t+864e5))]) if(Math.abs(p.t-t)<=win && (!best||Math.abs(p.t-t)<Math.abs(best.t-t))) best=p; return best; }
+
+function renderFromFile(days){
+  const st=$("#ffStrip"); if(!st) return;
+  const ev = rangePump(days), pts = rangePoints(days);
+  const dset = new Set([...pts.map(p=>ymd(p.t)), ...ev.map(e=>ymd(e.t))]); const nd = Math.max(1, dset.size);
+  const sum = k => ev.filter(e=>e.k===k).reduce((a,e)=>a+e.v,0), cnt = k => ev.filter(e=>e.k===k).length;
+  const ps = lastPumpSite();
+  const tiles = [
+    cnt(1) ? [`Carbs entered in pump`, `${Math.round(sum(1)/nd)} g`, `a day on average · ${cnt(1)} entries`] : null,
+    cnt(2) ? [`Insulin doses`, `${(sum(2)/nd).toFixed(1)} U`, `bolus a day on average · ${cnt(2)} doses`] : null,
+    cnt(3) ? [`Finger pricks`, `${cnt(3)}`, `in this period`] : null,
+    cnt(4) || ps ? [`Site changes (pump)`, `${cnt(4)}`, ps ? `last ${fmtD(ps)}` : "in this period"] : null,
+    cnt(5)+cnt(6) ? [`Pump / CGM alerts`, `${cnt(5)} low · ${cnt(6)} high`, `in this period`] : null,
+  ].filter(Boolean);
+  st.innerHTML = tiles.length ? tiles.map(([k,v,n])=>`<div class="stat"><span class="k">${k}</span><span class="v">${v}</span><span class="n">${n}</span></div>`).join("")
+    : `<div class="stat" style="grid-column:1/-1"><span class="k">Nothing extra yet</span><span class="n">Import a full export (for Medtronic: CareLink CSV with all data) to see carbs, insulin, finger pricks and site changes here.</span></div>`;
+  const eps = hypoEpisodes(pts).reverse();
+  $("#hypoTable").innerHTML = eps.length ? eps.slice(0,40).map(h=>{
+      const before = [...log.filter(e=>e.at<=h.start && e.at>=h.start-3*36e5 && /food|activity|ill|drink/.test(e.type)).map(e=>(e.type==="food"?(e.item||"Food")+(e.carbs!=null?` (${e.carbs} g)`:""):TYPES[e.type].label)),
+                      ...ev.filter(e=>e.t<=h.start && e.t>=h.start-3*36e5 && (e.k===1||e.k===2)).map(e=>e.k===1?`${e.v} g carbs (pump)`:`${e.v} U insulin`)];
+      const mins = Math.round((h.end-h.start)/6e4)+5;
+      return `<tr><td>${new Date(h.start).toLocaleString("en-GB",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</td><td class="num"><span class="chip ${h.min<3?"low":"high"} num">${h.min.toFixed(1)}</span></td><td class="num">${mins} min</td><td class="muted" style="overflow-wrap:anywhere">${before.length?esc([...new Set(before)].slice(0,4).join(", ")):"Nothing logged in the 3 hours before"}</td></tr>`; }).join("")
+    : `<tr><td colspan="4"><div class="empty">${pts.length?"No hypos detected in this period.":"Import CGM data to see hypos here."}</div></td></tr>`;
+}
 function renderInsights(st, days){
   const L=[]; const tir=pct(st.b.in,st.n), below=pct(st.b.low+st.b.vlow,st.n), above=pct(st.b.high+st.b.vhigh,st.n);
   const hrs = p => { const h=p*24/100; return h<1 ? Math.round(h*60)+" minutes" : h.toFixed(1)+" hours"; };
@@ -902,7 +989,7 @@ function renderComing(){
   const ag=$("#agenda"), wl=$("#watchList"); if(!ag||!wl) return;
   const now=Date.now(), horizon=now+7*864e5, items=[];
   const add=(at,text,cls="")=>{ if(at<=horizon) items.push({at,text,cls}); };
-  const site=last("site"), sensor=last("sensor");
+  const site=lastSite(), sensor=last("sensor");
   if(site){ const due=site.at+(num(plan.siteDays)??3)*864e5; add(due, `Site change due${isMedtronic()?" (infusion set + reservoir)":""}`, due<now?"bad":due-now<864e5?"warn":""); }
   if(sensor){ const due=sensor.at+(num(plan.sensorDays)??10)*864e5; add(due, "Sensor change due", due<now?"bad":due-now<864e5?"warn":""); }
   supplyRows().forEach(sp=>{ if(!sp.days) return; const orderBy=now+Math.max(0,(sp.left-(sp.lead??14)))*864e5; add(orderBy, `Order ${sp.name} (${Math.floor(sp.left)} days left)`, sp.left<=(sp.lead??14)?"bad":"warn"); });
@@ -1049,7 +1136,7 @@ function renderChecks(){
     </div>`; }).join("");
 }
 function growthChart(sel, pts, f, unit, dp){
-  const box=$(sel); if(pts.length<2){ box.innerHTML = `<div class="empty">${pts.length?"Add one more measurement to see a line.":"No measurements yet."}</div>`; return; }
+  const box=$(sel); if(!pts.length){ box.innerHTML = `<div class="empty">No measurements yet. Tap <strong>Add measurement</strong> to start his chart.</div>`; return; }
   const W=420, H=200, l=44, r=14, t=12, b=28;
   const t0=pts[0].at, t1=pts[pts.length-1].at, span=Math.max(t1-t0, 30*864e5);
   const vals=pts.map(p=>p[f]); let lo=Math.min(...vals), hi=Math.max(...vals); const pad=Math.max((hi-lo)*.15, f==="h"?1:.2); lo-=pad; hi+=pad;
@@ -1059,7 +1146,7 @@ function growthChart(sel, pts, f, unit, dp){
   g+=`<path d="M${pts.map(p=>`${X(p.at).toFixed(1)} ${Y(p[f]).toFixed(1)}`).join(" L")}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>`;
   pts.forEach((p,i)=>{ g+=`<circle cx="${X(p.at)}" cy="${Y(p[f])}" r="5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/><circle data-i="${i}" cx="${X(p.at)}" cy="${Y(p[f])}" r="14" fill="transparent" style="cursor:pointer"/>`; });
   const last=pts[pts.length-1]; g+=`<text x="${X(last.at)-8}" y="${Y(last[f])-10}" text-anchor="end" style="fill:var(--fg);font-weight:700">${last[f].toFixed(dp)} ${unit}</text>`;
-  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${f==="h"?"Height":"Weight"} over time">${g}</svg><div class="tip" hidden></div>`;
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${f==="h"?"Height":"Weight"} over time">${g}</svg><div class="tip" hidden></div>${pts.length===1?`<div class="muted" style="font-size:.85rem;margin-top:4px">Add another measurement to see how he's growing over time.</div>`:""}`;
   const tip=box.querySelector(".tip");
   box.querySelectorAll("[data-i]").forEach(c => { const show = () => { const p=pts[+c.dataset.i]; const prev=pts[+c.dataset.i-1];
       tip.innerHTML = `<div class="muted">${fmtD(p.at)}</div><div><b>${p[f].toFixed(dp)}</b> ${unit}</div>${prev?`<div class="muted">${p[f]-prev[f]>=0?"+":""}${(p[f]-prev[f]).toFixed(dp)} ${unit} since previous</div>`:""}`;
@@ -1087,7 +1174,7 @@ document.addEventListener("click", async ev => {
 
 
 /* ================= BACKUP ================= */
-const BK_COLS = ["log","cgm","growth","checks","supplies"];
+const BK_COLS = ["log","cgm","pump","growth","checks","supplies","appts"];
 let lastBackup = null, dl = null;
 function bkStatus(m){ const n=$("#bkStatus"); n.hidden=!m; n.textContent=m||""; }
 function renderBackup(){
@@ -1178,6 +1265,7 @@ renderAll();
   const fail = e => { clearTimeout(timer); note(e.code==="revoked" ? "" : "The saved data couldn't be loaded. Reopen the page to try again."); };
   base.onSnapshot(s => { plan = s.exists ? s.data() : {}; fillPlan(); renderAll(); ok(s); }, fail);
   base.collection("log").orderBy("at","desc").limit(1000).onSnapshot(s => { log = s.docs.map(d => ({id:d.id, ...d.data()})); loadNames(); renderAll(); ok(s); }, fail);
+  base.collection("pump").orderBy("day","desc").limit(120).onSnapshot(s => { pumpDays = {}; s.docs.forEach(d => { const x=d.data(); if(x?.day && Array.isArray(x.ev)) pumpDays[x.day]=x; }); renderGlucose(); renderAll(); ok(s); }, fail);
   base.collection("cgm").orderBy("day","desc").limit(120).onSnapshot(s => { cgmDays = {}; s.docs.forEach(d => { const x=d.data(); if(x?.day && Array.isArray(x.pts)) cgmDays[x.day]=x; }); renderGlucose(); renderLog(); renderMealPatterns(); renderComing(); ok(s); }, fail);
   base.collection("growth").onSnapshot(s => { growth = s.docs.map(d => ({id:d.id, ...d.data()})); renderChecks(); renderStrip(); renderLog(); ok(s); }, fail);
   base.collection("appts").onSnapshot(s => { appts = s.docs.map(d => ({id:d.id, ...d.data()})); renderAppts(); renderChecks(); renderComing(); renderStrip(); ok(s); }, fail);
