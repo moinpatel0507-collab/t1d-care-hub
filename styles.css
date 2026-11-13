@@ -348,3 +348,17 @@ nav#nav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent)
 .codebox{display:flex;justify-content:center;gap:4px;flex-wrap:nowrap;margin:6px 0}
 .codebox span{font:600 1.4rem/1 var(--mono);width:34px;height:46px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);border-radius:12px}
 @media (max-width:380px){.codebox span{width:29px;height:40px;font-size:1.15rem}}
+
+/* account chip in the header (family app) */
+.acct{position:relative;margin-left:8px;z-index:3}
+.hero-top:has(.acct){z-index:5}
+.hero:has(.acct-menu:not([hidden])){overflow:visible}
+.acct-btn{display:flex;align-items:center;gap:8px;background:var(--hero-chip);color:var(--hero-fg);border:1px solid rgb(255 255 255 / .14);border-radius:999px;padding:4px 12px 4px 4px;font-size:.85rem}
+.acct-btn:hover{background:rgb(255 255 255 / .18)}
+.acct-av{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--ring);color:#0b2e30;font:700 .8rem var(--display)}
+.acct-menu{position:absolute;right:0;top:calc(100% + 8px);min-width:220px;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 32px rgb(0 0 0 / .18);padding:6px;display:grid;gap:2px}
+.acct-who{padding:8px 12px;font-size:.85rem;color:var(--muted);border-bottom:1px solid var(--line);margin-bottom:4px}
+.acct-item{display:block;text-align:left;background:none;border:0;border-radius:10px;padding:10px 12px;color:var(--fg);text-decoration:none;font:600 .9rem var(--body)}
+.acct-item:hover{background:var(--sunk)}
+.acct-out{color:var(--low)}
+@media (max-width:720px){ .acct{margin-left:auto} .acct-nm{display:none} .acct-btn{padding:4px} .hero-date{order:3;width:100%} }

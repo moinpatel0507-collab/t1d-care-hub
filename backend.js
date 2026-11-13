@@ -254,7 +254,22 @@ async function start() {
   members = all || [];
   try { await loadAll(); } catch (e) { screen(`<h1>Couldn't load your data</h1><p class="muted">${esc(e.message)}</p><button class="primary" onclick="location.reload()">Try again</button>`); return; }
   gate.hidden = true; gate.innerHTML = '';
-  if (!started) { started = true; subscribe(); addFamilyPanel(); readyResolve(); }
+  if (!started) { started = true; subscribe(); addFamilyPanel(); addAccountChip(); readyResolve(); }
+}
+function addAccountChip() {
+  const top = document.querySelector('.hero-top'); if (!top || document.getElementById('acct')) return;
+  const meName = members.find(m => m.user_id === me)?.display_name || 'You';
+  const w = document.createElement('div'); w.id = 'acct'; w.className = 'acct';
+  w.innerHTML = `<button type="button" class="acct-btn" aria-haspopup="true" aria-expanded="false"><span class="acct-av">${esc(meName.slice(0,1).toUpperCase())}</span><span class="acct-nm">${esc(meName)}</span></button>
+    <div class="acct-menu" hidden><div class="acct-who">Signed in as <strong>${esc(meName)}</strong></div>
+    <a href="#plan" class="acct-item">Family code &amp; members</a><button type="button" class="acct-item acct-out">Sign out</button></div>`;
+  top.appendChild(w);
+  const btn = w.querySelector('.acct-btn'), menu = w.querySelector('.acct-menu');
+  const close = () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+  btn.onclick = (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); };
+  document.addEventListener('click', (e) => { if (!w.contains(e.target)) close(); });
+  w.querySelector('a.acct-item').onclick = () => { close(); setTimeout(() => document.querySelector('#v-plan .panel:last-child')?.scrollIntoView({ behavior: 'smooth' }), 150); };
+  w.querySelector('.acct-out').onclick = async () => { w.querySelector('.acct-out').textContent = 'Signing out…'; await supabase.auth.signOut(); location.reload(); };
 }
 function addFamilyPanel() {
   const host = document.querySelector('#v-plan'); if (!host) return;
