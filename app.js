@@ -746,6 +746,9 @@ const AK = { diabetes:{label:"Diabetes clinic", chip:"blue"}, gp:{label:"GP", ch
 $("#ap_kind").innerHTML = Object.entries(AK).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join("");
 $("#apptFilter").innerHTML += Object.entries(AK).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join("");
 const apptWhen = a => a.at;
+// old eye/dental check-ups (saved before appointments existed) shown as past appointments
+const legacyChecks = () => checks.map(c=>({id:"chk_"+c.id, chkId:c.id, kind:c.kind==="dental"?"dentist":"eye", status:"done", at:c.at, hasTime:false, where:c.where||"", who:"", notes:"", outcome:c.note||"", next:c.next||null, legacy:true}));
+const apptsAll = () => [...appts, ...legacyChecks()];
 function apptCard(a, past){
   const d = new Date(a.at), k = AK[a.kind] || AK.other, days = Math.round((midnight(a.at)-midnight(Date.now()))/864e5);
   const rel = a.status==="cancelled" ? "Cancelled" : past ? "" : days===0 ? "Today" : days===1 ? "Tomorrow" : days<0 ? "Overdue: mark done or cancelled" : `In ${days} days`;
@@ -769,7 +772,7 @@ function renderAppts(){
   const up = appts.filter(a=>a.status==="booked" && a.at>=today0).sort((a,b)=>a.at-b.at);
   const overdue = appts.filter(a=>a.status==="booked" && a.at<today0).sort((a,b)=>b.at-a.at);
   const f = $("#apptFilter").value;
-  const past = appts.filter(a=>a.status!=="booked" && (!f || a.kind===f)).sort((a,b)=>b.at-a.at);
+  const past = apptsAll().filter(a=>a.status!=="booked" && (!f || a.kind===f)).sort((a,b)=>b.at-a.at);
   $("#apptUpcoming").innerHTML = (overdue.map(a=>apptCard(a,false)).join("") + up.map(a=>apptCard(a,false)).join("")) || `<div class="empty">No appointments booked. Tap <strong>Add appointment</strong> for his next GP, clinic or vaccination.</div>`;
   $("#apptPast").innerHTML = past.length ? past.map(a=>apptCard(a,true)).join("") : `<div class="empty">Nothing here yet. When you mark an appointment done, it moves here with its outcome.</div>`;
   const vax = appts.filter(a=>a.kind==="vaccine" && a.status==="done").sort((a,b)=>b.at-a.at);
@@ -784,15 +787,15 @@ function renderAppts(){
   ].join("");
 }
 const apptDlg = $("#apptDlg"); let editingAppt = null;
-function apptKindFields(){ document.querySelectorAll("#apptForm [data-ak]").forEach(el=>el.hidden = el.dataset.ak !== $("#ap_kind").value); }
+function apptKindFields(){ document.querySelectorAll("#apptForm [data-ak]").forEach(el=>el.hidden = !el.dataset.ak.split(" ").includes($("#ap_kind").value)); }
 $("#ap_kind").addEventListener("change", apptKindFields);
-function openAppt(a, markDone){
+function openAppt(a, markDone, preset){
   if(!canWrite) return toast("Saving isn't switched on in this view");
   editingAppt = a || null; $("#apptForm").reset();
   $("#apptTitle").textContent = a ? (markDone ? "How did it go?" : "Edit appointment") : "Add appointment";
   if(a){ const d=new Date(a.at); $("#ap_kind").value=a.kind; $("#ap_status").value=markDone?"done":a.status; $("#ap_date").value=ymd(a.at);
-    $("#ap_time").value = a.hasTime ? `${pad2(d.getHours())}:${pad2(d.getMinutes())}` : ""; $("#ap_vax").value=a.vaccine||""; $("#ap_where").value=a.where||""; $("#ap_who").value=a.who||""; $("#ap_notes").value=a.notes||""; $("#ap_outcome").value=a.outcome||""; }
-  else { $("#ap_kind").value="diabetes"; $("#ap_status").value="booked"; $("#ap_date").value=ymd(Date.now()+7*864e5); }
+    $("#ap_time").value = a.hasTime ? `${pad2(d.getHours())}:${pad2(d.getMinutes())}` : ""; $("#ap_vax").value=a.vaccine||""; $("#ap_where").value=a.where||""; $("#ap_who").value=a.who||""; $("#ap_notes").value=a.notes||""; $("#ap_outcome").value=a.outcome||""; $("#ap_next").value=a.next?ymd(a.next):""; }
+  else { $("#ap_kind").value=preset?.kind||"diabetes"; $("#ap_status").value=preset?.status||"booked"; $("#ap_date").value=preset?.date||ymd(Date.now()+7*864e5); }
   apptKindFields(); apptDlg.showModal(); if(markDone) setTimeout(()=>$("#ap_outcome").focus(),50);
 }
 $("#addAppt").addEventListener("click", ()=>openAppt());
@@ -802,9 +805,13 @@ $("#apptForm").addEventListener("submit", async ev => { ev.preventDefault();
   const [y,m,d] = $("#ap_date").value.split("-").map(Number); if(!y) return toast("Pick a date");
   const t = $("#ap_time").value; const [hh,mm] = t ? t.split(":").map(Number) : [12,0];
   const body = { kind:$("#ap_kind").value, status:$("#ap_status").value, at:new Date(y,m-1,d,hh,mm).getTime(), hasTime:!!t, vaccine:$("#ap_kind").value==="vaccine"?$("#ap_vax").value.trim():"",
-    where:$("#ap_where").value.trim(), who:$("#ap_who").value.trim(), notes:$("#ap_notes").value.trim(), outcome:$("#ap_outcome").value.trim(), by:me };
+    where:$("#ap_where").value.trim(), who:$("#ap_who").value.trim(), notes:$("#ap_notes").value.trim(), outcome:$("#ap_outcome").value.trim(), by:me,
+    next: ["eye","dentist"].includes($("#ap_kind").value) && $("#ap_next").value ? (([yy,mm2,dd]) => new Date(yy,mm2-1,dd,12).getTime())($("#ap_next").value.split("-").map(Number)) : null };
   $("#apptSave").disabled = true;
-  try { editingAppt ? await base.collection("appts").doc(editingAppt.id).set(body) : await base.collection("appts").add(body); apptDlg.close(); toast("Saved"); }
+  try {
+    if(editingAppt?.legacy){ await base.collection("appts").add(body); await base.collection("checks").doc(editingAppt.chkId).delete(); }   // move an old check-up into appointments
+    else editingAppt ? await base.collection("appts").doc(editingAppt.id).set(body) : await base.collection("appts").add(body);
+    apptDlg.close(); toast("Saved"); }
   catch(err){ toast(`Couldn't save (${err.code||err.message||"error"})`); } finally { $("#apptSave").disabled = false; }
 });
 function icsFor(a){
@@ -822,10 +829,10 @@ function icsFor(a){
 async function getDownloads(){ dl ??= await (window.claude?.use?.("downloads") ?? null); return dl; }
 document.addEventListener("click", async ev => {
   const t = ev.target.closest("[data-adone],[data-aedit],[data-adel],[data-aics],[data-aprep]"); if(!t) return;
-  const id = t.dataset.adone||t.dataset.aedit||t.dataset.adel||t.dataset.aics||t.dataset.aprep; const a = appts.find(x=>x.id===id); if(!a) return;
+  const id = t.dataset.adone||t.dataset.aedit||t.dataset.adel||t.dataset.aics||t.dataset.aprep; const a = apptsAll().find(x=>x.id===id); if(!a) return;
   if(t.dataset.adone) return openAppt(a, true);
   if(t.dataset.aedit) return openAppt(a, false);
-  if(t.dataset.adel){ t.disabled=true; try { await deleteWithUndo("appts", id, "Appointment"); } catch { toast("Couldn't delete"); t.disabled=false; } return; }
+  if(t.dataset.adel){ t.disabled=true; try { await (a.legacy ? deleteWithUndo("checks", a.chkId, "Check-up") : deleteWithUndo("appts", id, "Appointment")); } catch { toast("Couldn't delete"); t.disabled=false; } return; }
   if(t.dataset.aics){ const d = await getDownloads(); if(!d) return toast("Saving files isn't available here");
     try { const r = await d.save({filename:`appointment-${ymd(a.at)}.ics`, data: icsFor(a)}); if(r.status==="saved") toast("Open the file to add it to your calendar"); }
     catch(e){ toast(e.code==="declined"?"Cancelled":e.code==="rejected_extension"?"Calendar files can't be saved in this view. Use the installed app":"Couldn't create the calendar file"); } return; }
@@ -950,7 +957,12 @@ let growth = [], checks = [];
 const CK = {eye:{label:"Eye check", months:12}, dental:{label:"Dental check", months:6}};
 const fmtD = ms => new Date(ms).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
 const addMonths = (ms,m) => { const d=new Date(ms); d.setMonth(d.getMonth()+m); return d.getTime(); };
-function lastCheck(kind){ return checks.filter(c=>c.kind===kind).sort((a,b)=>b.at-a.at)[0]; }
+function checkItems(kind){
+  const ak = kind==="dental" ? "dentist" : "eye";
+  return [...checks.filter(c=>c.kind===kind).map(c=>({...c, src:"check"})),
+          ...appts.filter(a=>a.kind===ak && a.status==="done").map(a=>({id:a.id, kind, at:a.at, where:a.where, note:a.outcome||a.notes, next:a.next||null, src:"appt"}))].sort((a,b)=>b.at-a.at);
+}
+function lastCheck(kind){ return checkItems(kind)[0]; }
 function nextDue(kind){ const l=lastCheck(kind); if(!l) return null; return l.next || addMonths(l.at, num(plan[kind+"Months"]) ?? CK[kind].months); }
 function dueInfo(kind){
   const d = nextDue(kind); if(d==null) return {v:"Not logged", n:"Add his last "+CK[kind].label.toLowerCase(), cls:"", days:null};
@@ -972,10 +984,12 @@ function renderChecks(){
   const rows = growth.slice().sort((a,b)=>b.at-a.at);
   $("#gTable").innerHTML = rows.length ? rows.map(g=>`<tr><td>${fmtD(g.at)}</td><td class="num">${g.h!=null?g.h.toFixed(1)+" cm":"—"}</td><td class="num">${g.w!=null?g.w.toFixed(2)+" kg":"—"}</td><td class="muted" style="overflow-wrap:anywhere">${esc(g.note||"")}</td><td style="text-align:right"><button class="small danger" data-gdel="${esc(g.id)}" ${canWrite?"":"disabled"}>Delete</button></td></tr>`).join("")
     : `<tr><td colspan="5"><div class="empty">No measurements yet. Add his height and weight from his last clinic visit or red book.</div></td></tr>`;
-  $("#checkCols").innerHTML = ["eye","dental"].map(k => { const list = checks.filter(c=>c.kind===k).sort((a,b)=>b.at-a.at); const d=dueInfo(k);
+  $("#checkCols").innerHTML = ["eye","dental"].map(k => { const list = checkItems(k); const d=dueInfo(k);
+    const booked = appts.filter(a=>a.kind===(k==="dental"?"dentist":"eye") && a.status==="booked" && a.at>=midnight(Date.now())).sort((a,b)=>a.at-b.at)[0];
     return `<div class="ckcard"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><h3>${CK[k].label}</h3><span class="chip ${d.cls==="bad"?"low":d.cls==="warn"?"high":d.days!=null?"ok":""}">${d.v}</span></div>
       <div class="muted" style="font-size:.85rem">${d.days!=null?d.n+" · ":""}Usual gap: every ${num(plan[k+"Months"]) ?? CK[k].months} months</div>
-      ${list.length ? `<ul class="ckhist">${list.map(c=>`<li><div style="min-width:0;overflow-wrap:anywhere"><strong>${fmtD(c.at)}</strong>${c.where?` · ${esc(c.where)}`:""}${c.note?`<div class="muted">${esc(c.note)}</div>`:""}${c.next?`<div class="muted">Next given: ${fmtD(c.next)}</div>`:""}</div><button class="small danger" data-cdel="${esc(c.id)}" ${canWrite?"":"disabled"}>Delete</button></li>`).join("")}</ul>` : `<div class="empty">No ${k} check-ups logged.</div>`}
+      ${booked?`<div class="booked-pill">Booked: ${fmtD(booked.at)}${booked.hasTime?" "+new Date(booked.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):""}${booked.where?" · "+esc(booked.where):""}</div>`:""}
+      ${list.length ? `<ul class="ckhist">${list.map(c=>`<li><div style="min-width:0;overflow-wrap:anywhere"><strong>${fmtD(c.at)}</strong>${c.where?` · ${esc(c.where)}`:""}${c.note?`<div class="muted">${esc(c.note)}</div>`:""}${c.next?`<div class="muted">Next given: ${fmtD(c.next)}</div>`:""}</div><button class="small danger" ${c.src==="appt"?`data-adel="${esc(c.id)}"`:`data-cdel="${esc(c.id)}"`} ${canWrite?"":"disabled"}>Delete</button></li>`).join("")}</ul>` : `<div class="empty">No ${k} check-ups logged.</div>`}
     </div>`; }).join("");
 }
 function growthChart(sel, pts, f, unit, dp){
@@ -1004,7 +1018,7 @@ $("#growForm").addEventListener("submit", async ev => { ev.preventDefault();
   const d={at:dateMs($("#g_date").value), h:num($("#g_h").value), w:num($("#g_w").value), note:$("#g_note").value.trim(), by:me};
   if(d.h==null && d.w==null){ toast("Enter a height or a weight"); return; }
   try { await base.collection("growth").add(d); growDlg.close(); toast("Saved"); } catch(err) { toast(`Couldn't save (${err.code||err.message||"error"})`); } });
-$("#addCheck").addEventListener("click", ()=>{ if(!canWrite) return (toast("Saving isn't switched on here. Open the page in a browser (see the note at the top)"), $("#dbNote").scrollIntoView({behavior:"smooth",block:"center"})); $("#chkForm").reset(); $("#c_date").value=ymd(Date.now()); chkDlg.showModal(); });
+$("#addCheck").addEventListener("click", ()=>openAppt(null, false, {kind:"dentist", status:"done", date:ymd(Date.now())}));
 $("#chkCancel").addEventListener("click", ()=>chkDlg.close());
 $("#chkForm").addEventListener("submit", async ev => { ev.preventDefault();
   const d={kind:$("#c_kind").value, at:dateMs($("#c_date").value), where:$("#c_where").value.trim(), note:$("#c_note").value.trim(), next:$("#c_next").value?dateMs($("#c_next").value):null, by:me};
@@ -1110,8 +1124,8 @@ renderAll();
   base.collection("log").orderBy("at","desc").limit(1000).onSnapshot(s => { log = s.docs.map(d => ({id:d.id, ...d.data()})); loadNames(); renderAll(); ok(s); }, fail);
   base.collection("cgm").orderBy("day","desc").limit(120).onSnapshot(s => { cgmDays = {}; s.docs.forEach(d => { const x=d.data(); if(x?.day && Array.isArray(x.pts)) cgmDays[x.day]=x; }); renderGlucose(); renderLog(); renderMealPatterns(); renderComing(); ok(s); }, fail);
   base.collection("growth").onSnapshot(s => { growth = s.docs.map(d => ({id:d.id, ...d.data()})); renderChecks(); renderStrip(); renderLog(); ok(s); }, fail);
-  base.collection("appts").onSnapshot(s => { appts = s.docs.map(d => ({id:d.id, ...d.data()})); renderAppts(); renderComing(); ok(s); }, fail);
-  base.collection("checks").onSnapshot(s => { checks = s.docs.map(d => ({id:d.id, ...d.data()})); renderChecks(); renderStrip(); ok(s); }, fail);
+  base.collection("appts").onSnapshot(s => { appts = s.docs.map(d => ({id:d.id, ...d.data()})); renderAppts(); renderChecks(); renderComing(); renderStrip(); ok(s); }, fail);
+  base.collection("checks").onSnapshot(s => { checks = s.docs.map(d => ({id:d.id, ...d.data()})); renderChecks(); renderAppts(); renderStrip(); ok(s); }, fail);
   base.collection("meta").doc("backup").onSnapshot(s => { lastBackup = s.exists ? s.data().at : null; renderBackup(); renderStrip(); }, () => {});
   base.collection("supplies").onSnapshot(s => { supplies = s.docs.map(d => ({id:d.id, ...d.data()})); renderAll(); ok(s); }, fail);
 })();

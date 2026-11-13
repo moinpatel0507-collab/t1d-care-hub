@@ -220,8 +220,8 @@ img{max-width:100%}
     </div>
     <div class="panel">
       <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end">
-        <div><h2>Eye and dental check-ups</h2><div class="muted">Next due date is worked out from the last visit, unless the optician or dentist gave you a date.</div></div>
-        <button class="primary" id="addCheck">Add check-up</button>
+        <div><h2>Eye and dental check-ups</h2><div class="muted">Next due date is worked out from the last visit, unless the optician or dentist gave you a date. Everything you add here also shows in Appointments.</div></div>
+        <button class="primary" id="addCheck">Add appointment</button>
       </div>
       <div class="twochart" id="checkCols"></div>
     </div>
@@ -380,6 +380,7 @@ img{max-width:100%}
       <label>Date<input id="ap_date" type="date" required></label>
       <label>Time<input id="ap_time" type="time"></label>
       <label data-ak="vaccine" hidden>Vaccine<input id="ap_vax" list="vaxList" placeholder="e.g. Flu nasal spray"></label>
+      <label data-ak="eye dentist" hidden>Next check due <small>only if they gave you a date</small><input id="ap_next" type="date"></label>
       <label>Where<input id="ap_where" placeholder="e.g. Stratford Health Centre"></label>
       <label>With<input id="ap_who" placeholder="e.g. Dr Patel, diabetes nurse"></label>
     </div>
