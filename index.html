@@ -37,26 +37,35 @@ img{max-width:100%}
   <div id="dbNote" class="notice" hidden></div>
 
   <nav id="nav" aria-label="Sections">
+    <div class="nav-brand"><span class="nb-ring"></span>T1D Care Hub</div>
+    <div class="nav-group">Every day</div>
     <a href="#today" class="pri"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></svg><span>Today</span></a>
     <a href="#glucose" class="pri"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c3 4.5 6 7.6 6 11a6 6 0 0 1-12 0c0-3.4 3-6.5 6-11z"/></svg><span>Glucose</span></a>
     <a href="#food" class="pri"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18M4.5 3v5a2.5 2.5 0 0 0 5 0V3M18 21V3c-2.2 0-3.5 3-3.5 7h3.5"/></svg><span>Food</span></a>
     <a href="#log" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg><span>History</span></a>
-    <a href="#supplies" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5l9-4.5 9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></svg><span>Supplies</span></a>
+    <div class="nav-group">His health</div>
+    <a href="#appts" class="pri"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h3"/></svg><span class="l-long">Appointments</span><span class="l-short">Appts</span></a>
     <a href="#checks" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11M10 20V5M16 20v-6M2 20h20"/><path d="M20 4v6M17 7h6"/></svg><span>Growth</span></a>
-    <a href="#appts" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h3"/></svg><span>Appointments</span></a>
+    <a href="#sick" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 17.5v-6"/></svg><span>Sick day</span></a>
+    <div class="nav-group">At home</div>
+    <a href="#supplies" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5l9-4.5 9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></svg><span>Supplies</span></a>
     <a href="#reports" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 17v-3M12 17v-6M15 17v-4"/></svg><span>Reports</span></a>
-    <a href="#sick" class="pri"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 17.5v-6"/></svg><span>Sick day</span></a>
+    <div class="nav-group">Settings</div>
     <a href="#plan" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zM9 11h6M9 15h4"/></svg><span>Care plan</span></a>
     <a href="#backup" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg><span>Backup</span></a>
     <button type="button" id="moreBtn" class="more" aria-expanded="false" aria-controls="moreSheet"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg><span>More</span></button>
   </nav>
   <div id="moreSheet" class="sheet" hidden>
     <div class="sheet-in">
+      <div class="sheet-group">Every day</div>
       <a href="#log"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg><span>History</span></a>
-      <a href="#supplies"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5l9-4.5 9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></svg><span>Supplies</span></a>
+      <div class="sheet-group">His health</div>
       <a href="#checks"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11M10 20V5M16 20v-6M2 20h20"/><path d="M20 4v6M17 7h6"/></svg><span>Growth</span></a>
-      <a href="#appts"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h3"/></svg><span>Appointments</span></a>
+      <a href="#sick"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 17.5v-6"/></svg><span>Sick day</span></a>
+      <div class="sheet-group">At home</div>
+      <a href="#supplies"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5l9-4.5 9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></svg><span>Supplies</span></a>
       <a href="#reports"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 17v-3M12 17v-6M15 17v-4"/></svg><span>Reports</span></a>
+      <div class="sheet-group">Settings</div>
       <a href="#plan"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zM9 11h6M9 15h4"/></svg><span>Care plan</span></a>
       <a href="#backup"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg><span>Backup</span></a>
     </div>
@@ -84,6 +93,7 @@ img{max-width:100%}
         <button class="qt t-grey" data-q="activity"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></span><span class="ql">Activity</span><span class="qs">Play, swimming, park</span></button>
         <button class="qt t-grey" data-q="note"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/></svg></span><span class="ql">Note</span><span class="qs">Question for clinic</span></button>
       </div>
+      <a class="sick-link" href="#sick"><span>Unwell, or ketones high?</span><b>Open the sick-day guide →</b></a>
     </div>
     <div class="panel">
       <h2>Recent</h2>
@@ -124,7 +134,7 @@ img{max-width:100%}
     </div>
     <div class="panel">
       <div><h2>Supplies</h2><div class="muted">Days left = stock × days each unit lasts. Linked items count down when you log a site or sensor change.</div></div>
-      <div class="table-wrap"><table>
+      <div class="table-wrap"><table class="cards">
         <thead><tr><th>Item</th><th>In stock</th><th>Days left</th><th>Until next delivery</th><th>Status</th><th></th></tr></thead>
         <tbody id="supTable"></tbody>
       </table></div>
@@ -181,7 +191,7 @@ img{max-width:100%}
       <div><h2>From his pump and CGM file</h2><div class="muted">Everything else the import found: carbs entered in the pump, insulin doses, finger pricks, site changes and alerts, plus every hypo the CGM picked up.</div></div>
       <div class="strip" id="ffStrip"></div>
       <div><h3>Hypos detected by the CGM</h3><div class="muted" style="font-size:.85rem">Below 3.9 mmol/L for 15 minutes or more.</div></div>
-      <div class="table-wrap"><table><thead><tr><th>When</th><th style="text-align:right">Lowest</th><th style="text-align:right">How long</th><th>Before it</th></tr></thead><tbody id="hypoTable"></tbody></table></div>
+      <div class="table-wrap"><table class="cards"><thead><tr><th>When</th><th style="text-align:right">Lowest</th><th style="text-align:right">How long</th><th>Before it</th></tr></thead><tbody id="hypoTable"></tbody></table></div>
     </div>
     <div class="panel">
       <h2>What this means</h2>
@@ -229,7 +239,7 @@ img{max-width:100%}
         <div><h3>Height <span class="muted" style="font-weight:400">cm</span></h3><div class="chartbox small" id="hChart"></div></div>
         <div><h3>Weight <span class="muted" style="font-weight:400">kg</span></h3><div class="chartbox small" id="wChart"></div></div>
       </div>
-      <div class="table-wrap"><table>
+      <div class="table-wrap"><table class="cards">
         <thead><tr><th>Date</th><th style="text-align:right">Height</th><th style="text-align:right">Weight</th><th>Notes</th><th></th></tr></thead>
         <tbody id="gTable"></tbody>
       </table></div>
@@ -262,7 +272,7 @@ img{max-width:100%}
     </div>
     <div class="panel">
       <div><h2>Vaccinations</h2><div class="muted">Every vaccination marked as done. Check it against his red book.</div></div>
-      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Vaccine</th><th>Where</th><th>Notes</th></tr></thead><tbody id="vaxTable"></tbody></table></div>
+      <div class="table-wrap"><table class="cards"><thead><tr><th>Date</th><th>Vaccine</th><th>Where</th><th>Notes</th></tr></thead><tbody id="vaxTable"></tbody></table></div>
     </div>
   </section>
 

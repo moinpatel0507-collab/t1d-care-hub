@@ -69,7 +69,7 @@ function renderHeroRing(){
   const col = !s ? "var(--hero-muted)" : frac<=0 ? "#ff9b91" : frac<0.2 ? "#ffd28a" : "var(--ring)";
   el.innerHTML = `<svg viewBox="0 0 132 132" width="132" height="132"><circle cx="66" cy="66" r="${R}" fill="none" stroke="var(--hero-chip)" stroke-width="12"/><circle cx="66" cy="66" r="${R}" fill="none" stroke="${col}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${(C*frac).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 66 66)"/></svg><div class="hr-in"><b>${big}</b><span>${small}</span></div>`;
 }
-function renderHero(){ renderHeroRing();
+function renderHero(){ renderHeroRing(); try { $("#who").textContent = friendlyLine(); } catch {}
   const h=new Date().getHours(); const nm=(plan.name||"").trim();
   $("#heroTitle").textContent = (h<12?"Good morning":h<18?"Good afternoon":"Good evening") + (nm?`, here's ${nm}'s day`:"");
   $("#heroDate").textContent = new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
@@ -656,13 +656,13 @@ function renderGlucose(){
     $("#gInsights").innerHTML = `<li class="muted">Import CGM data to see plain-English patterns here.</li>`;
   } else {
     const tir = pct(st.b.in, st.n);
-    $("#gStats").innerHTML = [
-      `<div class="stat ${tir<50?"bad":tir<70?"warn":""}"><span class="k">Time in range</span><span class="v">${Math.round(tir)}%</span><span class="n">Target: more than 70%</span></div>`,
-      `<div class="stat"><span class="k">Average glucose</span><span class="v">${st.mean.toFixed(1)}</span><span class="n">mmol/L</span></div>`,
-      `<div class="stat"><span class="k">Estimated HbA1c (GMI)</span><span class="v">${st.gmiMmol}</span><span class="n">mmol/mol · ${st.gmiPct.toFixed(1)}% · lab test may differ</span></div>`,
-      `<div class="stat ${st.cv>36?"warn":""}"><span class="k">Ups and downs (CV)</span><span class="v">${Math.round(st.cv)}%</span><span class="n">${st.cv>36?"Above 36%: quite variable":"36% or less: steady"}</span></div>`,
-      `<div class="stat ${st.coverage<70?"warn":""}"><span class="k">Sensor data</span><span class="v">${Math.round(st.coverage)}%</span><span class="n">${st.coverage<70?"Under 70%: numbers less reliable":"Enough data to trust"}</span></div>`
-    ].join("");
+    { const segs=[["in","var(--ok)"],["high","var(--high)"],["vhigh","var(--vhigh)"],["low","var(--low)"],["vlow","var(--vlow)"]]; const R=58, C=2*Math.PI*R; let off=0;
+      const arcs = segs.map(([k,c])=>{ const f=pct(st.b[k],st.n)/100; if(f<=0) return ""; const a=`<circle cx="70" cy="70" r="${R}" fill="none" stroke="${c}" stroke-width="16" stroke-dasharray="${Math.max(0,C*f-(f<1?2:0)).toFixed(1)} ${C.toFixed(1)}" stroke-dashoffset="${(-off*C).toFixed(1)}" transform="rotate(-90 70 70)"/>`; off+=f; return a; }).join("");
+      const met = (k,v,u,n,cls="") => `<div class="gm ${cls}"><span class="k">${k}</span><span class="v">${v}<small>${u}</small></span><span class="n">${n}</span></div>`;
+      $("#gStats").innerHTML = `<div class="gsum"><div class="gdonut"><svg viewBox="0 0 140 140" width="140" height="140" aria-hidden="true"><circle cx="70" cy="70" r="${R}" fill="none" stroke="var(--sunk)" stroke-width="16"/>${arcs}</svg>
+        <div class="gd-in"><b>${Math.round(tir)}%</b><span>in range</span></div></div>
+        <div class="gd-meta"><div class="gd-title ${tir>=70?"good":"bad"}">${tir>=70?"On target":"Below target"}<span>target is over 70% in range</span></div>
+          <div class="gms">${met("Average", st.mean.toFixed(1), " mmol/L", "across the period")}${met("Est. HbA1c", st.gmiMmol, " mmol/mol", st.gmiPct.toFixed(1)+"% · lab may differ")}${met("Ups & downs", Math.round(st.cv), "%", st.cv>36?"quite variable":"steady", st.cv>36?"warn":"")}${met("Sensor data", Math.round(st.coverage), "%", st.coverage<70?"gaps: less reliable":"enough to trust", st.coverage<70?"warn":"")}</div></div></div>`; }
     const rows = [["vhigh","Very high","above 13.9","under 5%",v=>v<5],["high","High","10.1–13.9","",null],["in","In range","3.9–10.0","over 70%",v=>v>70],["low","Low","3.0–3.8","under 4%",v=>v<4],["vlow","Very low","below 3.0","under 1%",v=>v<1]];
     $("#tirBar").innerHTML = `<div class="tir" role="img" aria-label="Time in range bar">${["vlow","low","in","high","vhigh"].map(k=>{const p=pct(st.b[k],st.n); return p>0?`<i style="width:${p}%;background:var(--${k==="in"?"ok":k})" title="${p.toFixed(1)}%"></i>`:"";}).join("")}</div>
       <div class="tirlist">${rows.map(([k,l,r,t,f])=>{const p=pct(st.b[k],st.n); const hrs=p*24/100; return `<div><span class="sw" style="background:var(--${k==="in"?"ok":k})"></span><span>${l} <span class="muted">${r} mmol/L · about ${hrs<1?Math.round(hrs*60)+" min":hrs.toFixed(1)+" h"} a day</span></span><span class="pc">${p.toFixed(p<10?1:0)}%</span><span class="tg ${f?(f(p)?"good":"bad"):""}">${t?"target "+t:""}</span></div>`;}).join("")}</div>`;
@@ -698,8 +698,12 @@ function renderDay(){
   evs.filter(e=>e.type==="food").forEach(e=>{ const x=xH((e.at-d0)/36e5); g+=`<line x1="${x}" x2="${x}" y1="${CH.t}" y2="${laneY-8}" stroke="var(--ok)" stroke-opacity=".45" stroke-dasharray="2 3"/>`; });
   // glucose line, coloured by band, broken on gaps
   const col = v => v<3.9 ? "var(--low)" : v>10 ? "var(--high)" : "var(--accent)";
+  g += `<defs><linearGradient id="gfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".22"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>`;
+  g += `<text x="${CH.l+8}" y="${yS(10)+15}" style="fill:var(--ok);font-weight:700;font-size:11px">Target 3.9–10</text>`;
+  { let seg=[]; const flush=()=>{ if(seg.length>1){ const base=yS(2); g+=`<path d="M${seg[0][0]} ${base} L${seg.map(q=>q.join(" ")).join(" L")} L${seg[seg.length-1][0]} ${base} Z" fill="url(#gfill)"/>`; } seg=[]; };
+    pts.forEach((q,i)=>{ if(i && q.t-pts[i-1].t>20*6e4) flush(); seg.push([xH((q.t-d0)/36e5).toFixed(1), yS(q.v).toFixed(1)]); }); flush(); }
   for(let i=1;i<pts.length;i++){ const a=pts[i-1], b=pts[i]; if(b.t-a.t>20*6e4) continue;
-    g+=`<line x1="${xH((a.t-d0)/36e5).toFixed(1)}" y1="${yS(a.v).toFixed(1)}" x2="${xH((b.t-d0)/36e5).toFixed(1)}" y2="${yS(b.v).toFixed(1)}" stroke="${col((a.v+b.v)/2)}" stroke-width="2" stroke-linecap="round"/>`; }
+    g+=`<line x1="${xH((a.t-d0)/36e5).toFixed(1)}" y1="${yS(a.v).toFixed(1)}" x2="${xH((b.t-d0)/36e5).toFixed(1)}" y2="${yS(b.v).toFixed(1)}" stroke="${col((a.v+b.v)/2)}" stroke-width="2.6" stroke-linecap="round"/>`; }
   manual.forEach(e=>{ g+=`<circle cx="${xH((e.at-d0)/36e5)}" cy="${yS(e.gl)}" r="5" fill="var(--surface)" stroke="var(--fg)" stroke-width="2"/>`; });
   // event lane
   g+=`<text x="${CH.l-6}" y="${laneY+4}" text-anchor="end">Events</text><line x1="${CH.l}" x2="${CH.W-CH.r}" y1="${laneY}" y2="${laneY}" stroke="var(--line)"/>`;
@@ -983,6 +987,24 @@ document.addEventListener("click", async ev => {
     try { await navigator.clipboard.writeText(txt); toast("Copied: paste it into an email to his team"); } catch { toast("Couldn't copy. Use History → Copy summary"); } }
 });
 
+
+
+/* ===== design v3 helpers ===== */
+const VIEW_TITLES = {glucose:["Glucose","His CGM data, patterns and what they mean"], food:["Food & drink","Meals, drinks and how they affect his glucose"], log:["History","Everything you've logged, and the clinic summary"],
+  supplies:["Supplies","Stock at home and the next delivery"], checks:["Growth & check-ups","Height, weight, eyes and teeth"], appts:["Appointments","GP, clinic, vaccinations and more"],
+  reports:["Reports","Round-ups to keep or share"], sick:["Sick day","What to do when he's unwell"], plan:["Care plan","His details, targets and contacts"], backup:["Backup","Keep a copy of everything"]};
+for (const [k,[t,sub]] of Object.entries(VIEW_TITLES)) { const sec = document.getElementById("v-"+k); const ic = document.querySelector(`#nav a[href="#${k}"] .ic`); if(!sec || sec.querySelector(".view-head")) continue;
+  const h = document.createElement("div"); h.className = "view-head"; h.innerHTML = `<span class="vh-ic">${ic?ic.outerHTML:""}</span><div><h1>${t}</h1><p>${sub}</p></div>`; sec.prepend(h); }
+function labelCardTables(){ document.querySelectorAll("table.cards").forEach(t => { const hs=[...t.querySelectorAll("thead th")].map(th=>th.textContent.trim()); t.querySelectorAll("tbody tr").forEach(tr => [...tr.children].forEach((td,i)=>{ if(hs[i] && !td.hasAttribute("colspan")) td.dataset.label = hs[i]; })); }); }
+new MutationObserver(() => labelCardTables()).observe(document.querySelector(".wrap"), {childList:true, subtree:true});
+function friendlyLine(){
+  const bits=[]; const tp = dayPoints(ymd(Date.now())); const s1 = tp.length>12 ? statsOf(tp) : null;
+  if(s1) bits.push(`In range ${Math.round(s1.tir)}% so far today`);
+  const na = (typeof appts!=="undefined") ? appts.filter(a=>a.status==="booked" && a.at>=midnight(Date.now())).sort((a,b)=>a.at-b.at)[0] : null;
+  if(na){ const d=Math.round((midnight(na.at)-midnight(Date.now()))/864e5); bits.push(`${(AK[na.kind]||AK.other).label} ${d===0?"today":d===1?"tomorrow":"in "+d+" days"}`); }
+  const short = supplyRows().filter(x=>x.status==="Reorder now"); if(short.length) bits.push(`${short.length} suppl${short.length===1?"y":"ies"} to order`);
+  return bits.length ? bits.join(" · ") : "Log meals and changes as you go. It all adds up for his clinic.";
+}
 
 /* ================= REPORTS (home round-up + PDF) ================= */
 function rpRange(){
