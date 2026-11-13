@@ -15,14 +15,14 @@ let db = null, base = null, plan = {}, log = [], supplies = [];
 let canWrite = false, me = null, names = {}, userCap = null;
 
 /* ---------- views ---------- */
-const VIEWS = ["today","glucose","food","log","supplies","checks","appts","sick","plan","backup"];
+const VIEWS = ["today","glucose","food","log","supplies","checks","appts","reports","sick","plan","backup"];
 function route(){
   const v = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "today";
   VIEWS.forEach(n => $("#v-"+n).hidden = n !== v);
   document.querySelectorAll("#nav a, #moreSheet a").forEach(a => a.getAttribute("href") === "#"+v ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"));
   const secOn = !!document.querySelector('#nav a.sec[aria-current="page"]');
   $("#moreBtn").classList.toggle("on", secOn); $("#moreSheet").hidden = true; $("#moreBtn").setAttribute("aria-expanded","false");
-  scrollTo({top:0}); if(v==="glucose" && typeof renderGlucose==="function") setTimeout(renderGlucose,0);
+  scrollTo({top:0}); if(v==="glucose" && typeof renderGlucose==="function") setTimeout(renderGlucose,0); if(v==="reports" && typeof renderReport==="function") setTimeout(renderReport,0);
 }
 addEventListener("hashchange", route); route();
 $("#moreBtn").addEventListener("click", () => { const sh=$("#moreSheet"); sh.hidden=!sh.hidden; $("#moreBtn").setAttribute("aria-expanded", String(!sh.hidden)); });
@@ -78,7 +78,7 @@ function renderHero(){ renderHeroRing();
   const chips=[["Site",site.v.replace(" left",""),site.cls],["Carbs",t.carbs+" g",""],["Drinks",t.ml+" ml",""],["Last ate",lf?new Date(lf.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):"—",""],["Hypos 7d",String(wk),wk>=3?"warn":""]];
   $("#heroChips").innerHTML = chips.map(([k,v,c])=>`<div class="hchip ${c}"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>`).join("");
 }
-function renderAll(){ renderHero(); renderStrip(); renderRecent(); renderFood(); renderLog(); renderSupplies(); renderSick(); renderItems(); renderGlucose(); renderChecks(); renderBackup(); renderMealPatterns(); renderComing(); renderAppts(); renderDeliveries(); }
+function renderAll(){ renderHero(); renderStrip(); renderRecent(); renderFood(); renderLog(); renderSupplies(); renderSick(); renderItems(); renderGlucose(); renderChecks(); renderBackup(); renderMealPatterns(); renderComing(); renderAppts(); renderDeliveries(); renderReport(); }
 const dayKey = ms => new Date(ms).toDateString();
 function dayTotals(key){ const es = log.filter(e => dayKey(e.at)===key && (e.type==="food"||e.type==="drink"));
   return { carbs: es.reduce((a,e)=>a+(e.carbs||0),0), ml: es.filter(e=>e.type==="drink").reduce((a,e)=>a+(e.ml||0),0), meals: es.filter(e=>e.type==="food").length, drinks: es.filter(e=>e.type==="drink").length, es }; }
@@ -981,6 +981,121 @@ document.addEventListener("click", async ev => {
   if(t.dataset.aprep){ renderLog(); const qs = [...document.querySelectorAll("#mealPatterns .mpq li")].map((li,i)=>`${i+1}. ${li.textContent}`);
     const txt = `Clinic appointment ${fmtD(a.at)}${a.where?" at "+a.where:""}\n\n${$("#clinicText").textContent}${a.notes?`\n\nOur questions:\n${a.notes}`:""}${qs.length?`\n\nQuestions about meals:\n${qs.join("\n")}`:""}`;
     try { await navigator.clipboard.writeText(txt); toast("Copied: paste it into an email to his team"); } catch { toast("Couldn't copy. Use History → Copy summary"); } }
+});
+
+
+/* ================= REPORTS (home round-up + PDF) ================= */
+function rpRange(){
+  const v = $("#rpPeriod").value, today = midnight(Date.now());
+  document.querySelectorAll("[data-rp]").forEach(el => el.hidden = v!=="custom");
+  if(v==="custom"){ const f=$("#rpFrom").value, t=$("#rpTo").value; if(f && t){ const a=dateMs(f), b=dateMs(t); return [midnight(Math.min(a,b)), midnight(Math.max(a,b))+864e5-1]; } }
+  if(v==="month"){ const d=new Date(today); const first=new Date(d.getFullYear(), d.getMonth()-1, 1).getTime(), last=new Date(d.getFullYear(), d.getMonth(), 1).getTime()-1; return [first, last]; }
+  const n = v==="custom" ? 7 : +v; return [today-(n-1)*864e5, today+864e5-1];
+}
+function ptsBetween(a,b){ const out=[]; for(let d=midnight(a); d<=b; d+=864e5) out.push(...dayPoints(ymd(d))); return out.filter(p=>p.t>=a && p.t<=b); }
+function pumpBetween(a,b){ const out=[]; for(let d=midnight(a); d<=b; d+=864e5) out.push(...dayPump(ymd(d))); return out.filter(e=>e.t>=a && e.t<=b); }
+function statsOf(pts){ if(!pts.length) return null; const n=pts.length, mean=pts.reduce((x,p)=>x+p.v,0)/n; const b={vlow:0,low:0,in:0,high:0,vhigh:0}; pts.forEach(p=>b[band(p.v)]++);
+  const sd=Math.sqrt(pts.reduce((x,p)=>x+(p.v-mean)**2,0)/n); return {n, mean, tir:pct(b.in,n), below:pct(b.low+b.vlow,n), above:pct(b.high+b.vhigh,n), cv:sd/mean*100, b}; }
+function arrow(now, before, goodUp){ if(now==null || before==null) return ""; const d=now-before; if(Math.abs(d)<0.5) return `<span class="rp-same">same as before</span>`;
+  const good = goodUp ? d>0 : d<0; return `<span class="${good?"rp-up":"rp-down"}">${d>0?"▲":"▼"} ${Math.abs(d).toFixed(Math.abs(d)<10?1:0)} vs previous</span>`; }
+function buildReport(){
+  const [a,b] = rpRange(), len = b-a+1, pa = a-len, pb = a-1, days = Math.round(len/864e5);
+  const name = P("name") || "His";
+  const pts = ptsBetween(a,b), prev = ptsBetween(pa,pb), st = statsOf(pts), sp = statsOf(prev);
+  const L = log.filter(e=>e.at>=a && e.at<=b), Lp = log.filter(e=>e.at>=pa && e.at<=pb);
+  const eps = hypoEpisodes(pts), epsP = hypoEpisodes(prev);
+  const foods = L.filter(e=>e.type==="food"), drinks = L.filter(e=>e.type==="drink");
+  const foodDays = new Set(foods.map(e=>ymd(e.at))).size || 1;
+  const carbsDay = foods.length ? Math.round(foods.reduce((x,e)=>x+(e.carbs||0),0)/foodDays) : null;
+  const pev = pumpBetween(a,b), pc = pev.filter(e=>e.k===1), pi = pev.filter(e=>e.k===2), psite = pev.filter(e=>e.k===4);
+  const pumpDaysN = new Set(pev.map(e=>ymd(e.t))).size || 1;
+  const fmtR = ms => new Date(ms).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+  // per-day bars
+  const dayRows = []; for(let d=midnight(a); d<=b; d+=864e5){ const s1 = statsOf(dayPoints(ymd(d))); dayRows.push({d, s:s1}); }
+  const W=700, Hh=150, l=34, bw=Math.max(6, Math.min(40, (W-l-10)/dayRows.length - 4));
+  let bars = `<svg viewBox="0 0 ${W} ${Hh+30}" width="100%" role="img" aria-label="Time in range each day">`;
+  [0,50,70,100].forEach(v=>{ const y=10+(1-v/100)*Hh; bars+=`<line x1="${l}" x2="${W}" y1="${y}" y2="${y}" stroke="${v===70?"#2b8a52":"#dbe4e1"}" ${v===70?'stroke-dasharray="4 4"':""}/><text x="${l-6}" y="${y+4}" text-anchor="end" font-size="11" fill="#5a6b66">${v}%</text>`; });
+  dayRows.forEach((r,i)=>{ const x = l+6+i*((W-l-10)/dayRows.length); if(!r.s){ bars+=`<text x="${x+bw/2}" y="${10+Hh-4}" text-anchor="middle" font-size="10" fill="#9aa">–</text>`; }
+    else { let y=10+Hh; [["vlow","#7d1611"],["low","#c0322b"],["in","#2b8a52"],["high","#a86100"],["vhigh","#d97a00"]].forEach(([k,c])=>{ const h=pct(r.s.b[k],r.s.n)/100*Hh; if(h>0){ y-=h; bars+=`<rect x="${x}" y="${y}" width="${bw}" height="${h}" fill="${c}"/>`; } }); }
+    if(dayRows.length<=14 || i%Math.ceil(dayRows.length/14)===0) bars+=`<text x="${x+bw/2}" y="${Hh+26}" text-anchor="middle" font-size="10" fill="#5a6b66">${new Date(r.d).toLocaleDateString("en-GB",{day:"numeric",month:dayRows.length>14?"short":undefined, weekday:dayRows.length<=7?"short":undefined})}</text>`; });
+  bars += `</svg>`;
+  const good = dayRows.filter(r=>r.s).sort((x,y)=>y.s.tir-x.s.tir);
+  // meals
+  const mo = mealOutcomes(Math.max(days, Math.ceil((Date.now()-a)/864e5))).filter(r=>r.at>=a && r.at<=b); const g={}; mo.forEach(r=>(g[r.key] ||= []).push(r));
+  const mealsT = Object.values(g).filter(x=>x.length>=2).map(x=>({item:x[0].item, n:x.length, highs:x.filter(y=>y.high).length, lows:x.filter(y=>y.low).length, rise:x.reduce((s,y)=>s+y.rise,0)/x.length}));
+  const smooth = mealsT.filter(m=>!m.lows && m.highs/m.n<=0.34).sort((x,y)=>x.rise-y.rise).slice(0,3), hard = mealsT.filter(m=>m.lows || m.highs/m.n>=0.5).sort((x,y)=>(y.lows+y.highs)/y.n-(x.lows+x.highs)/x.n).slice(0,3);
+  const refused = foods.filter(e=>e.ate==="Refused"||e.ate==="A little").length;
+  const notes = L.filter(e=>e.type==="note"||e.type==="ill").sort((x,y)=>x.at-y.at);
+  const hyposLogged = L.filter(e=>e.type==="hypo").length, hyposLoggedP = Lp.filter(e=>e.type==="hypo").length;
+  const upcoming = appts.filter(x=>x.status==="booked" && x.at>=midnight(Date.now()) && x.at<=Date.now()+30*864e5).sort((x,y)=>x.at-y.at);
+  const toOrder = supplyRows().filter(x=>x.status!=="OK"); const nd = nextDelivery();
+  const card = (k,v,n,extra="") => `<div class="rp-card"><div class="rp-k">${k}</div><div class="rp-v">${v}</div><div class="rp-n">${n}</div>${extra?`<div class="rp-n">${extra}</div>`:""}</div>`;
+  const title = days<=7 ? `${name==="His"?"His":name+"'s"} week` : days<=31 ? `${name==="His"?"His":name+"'s"} month` : `${name==="His"?"His":name+"'s"} report`;
+  const hi = [];
+  if(st){ hi.push(st.tir>=70 ? `In range <b>${Math.round(st.tir)}%</b> of the time, meeting the usual target of over 70%.` : `In range <b>${Math.round(st.tir)}%</b> of the time. The usual target is over 70%.`);
+    if(good.length>1) hi.push(`Best day: <b>${new Date(good[0].d).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"short"})}</b> (${Math.round(good[0].s.tir)}% in range). Hardest: <b>${new Date(good[good.length-1].d).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"short"})}</b> (${Math.round(good[good.length-1].s.tir)}%).`);
+    if(eps.length){ const c=Array(12).fill(0); eps.forEach(h=>c[Math.floor(new Date(h.start).getHours()/2)]++); const mx=Math.max(...c), i=c.indexOf(mx); hi.push(`<b>${eps.length} hypo${eps.length===1?"":"s"}</b> picked up by the CGM${mx>=2?`, most often between ${pad2(i*2)}:00 and ${pad2(i*2+2)}:00`:""}. Lowest ${Math.min(...eps.map(h=>h.min)).toFixed(1)} mmol/L.`); }
+    else hi.push(`No hypos picked up by the CGM.`); }
+  else hi.push(`No CGM data for this period yet. Import his CareLink file on the Glucose tab to fill in the glucose part of this report.`);
+  if(refused) hi.push(`He refused or barely ate <b>${refused}</b> meal${refused===1?"":"s"}.`);
+  if(L.some(e=>e.type==="ill")) hi.push(`He was unwell on ${new Set(L.filter(e=>e.type==="ill").map(e=>ymd(e.at))).size} day(s) in this period.`);
+  return `<div class="rp-head"><div><div class="rp-eyebrow">T1D Care Hub · report for the family</div><h1>${esc(title)}</h1><div class="rp-sub">${fmtR(a)} – ${fmtR(Math.min(b, Date.now()))}${P("pump")?` · ${esc(P("pump"))}`:""}${P("cgm")?` + ${esc(P("cgm"))}`:""}</div></div><div class="rp-ring"><b>${st?Math.round(st.tir)+"%":"–"}</b><span>in range</span></div></div>
+  <div class="rp-cards">
+    ${card("Time in range", st?Math.round(st.tir)+"%":"–", "target over 70%", st&&sp?arrow(st.tir, sp.tir, true):"")}
+    ${card("Average glucose", st?st.mean.toFixed(1):"–", "mmol/L", st&&sp?arrow(st.mean, sp.mean, false):"")}
+    ${card("Hypos (CGM)", st?eps.length:"–", `${hyposLogged} treated and logged`, st&&sp?arrow(eps.length, epsP.length, false):"")}
+    ${card("Time high", st?Math.round(st.above)+"%":"–", "above 10 mmol/L", st&&sp?arrow(st.above, sp.above, false):"")}
+    ${card("Carbs eaten", carbsDay!=null?carbsDay+" g":"–", "a day (from Food log)", pc.length?`${Math.round(pc.reduce((x,e)=>x+e.v,0)/pumpDaysN)} g a day entered in pump`:"")}
+    ${card("Drinks", drinks.length?Math.round(drinks.reduce((x,e)=>x+(e.ml||0),0)/(new Set(drinks.map(e=>ymd(e.at))).size||1))+" ml":"–", "a day", "")}
+    ${card("Site changes", L.filter(e=>e.type==="site").length + psite.length, "logged + from pump", "")}
+    ${card("Sensor changes", L.filter(e=>e.type==="sensor").length, "logged", "")}
+  </div>
+  <h2>Highlights</h2><ul class="rp-list">${hi.map(h=>`<li>${h}</li>`).join("")}</ul>
+  <h2>Time in range each day</h2>${bars}
+  <div class="rp-legend"><span><i style="background:#2b8a52"></i>In range 3.9–10</span><span><i style="background:#a86100"></i>High</span><span><i style="background:#c0322b"></i>Low</span><span><i style="border-top:2px dashed #2b8a52;height:0;border-radius:0"></i>70% target</span></div>
+  <div class="rp-two">
+    <div><h2>Meals that went smoothly</h2>${smooth.length?`<ul class="rp-list">${smooth.map(m=>`<li><b>${esc(m.item)}</b> · rose ${m.rise.toFixed(1)} on average (${m.n}×)</li>`).join("")}</ul>`:`<p class="rp-muted">Not enough repeated meals yet.</p>`}</div>
+    <div><h2>Meals that were harder</h2>${hard.length?`<ul class="rp-list">${hard.map(m=>`<li><b>${esc(m.item)}</b> · high ${m.highs}/${m.n}, low ${m.lows}/${m.n}</li>`).join("")}</ul>`:`<p class="rp-muted">None stood out.</p>`}</div>
+  </div>
+  ${eps.length?`<h2>Hypos</h2><table class="rp-table"><thead><tr><th>When</th><th>Lowest</th><th>How long</th></tr></thead><tbody>${eps.slice(-12).reverse().map(h=>`<tr><td>${new Date(h.start).toLocaleString("en-GB",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</td><td>${h.min.toFixed(1)} mmol/L</td><td>${Math.round((h.end-h.start)/6e4)+5} min</td></tr>`).join("")}</tbody></table>`:""}
+  ${notes.length?`<h2>Notes and questions</h2><ul class="rp-list">${notes.slice(-10).map(e=>`<li><b>${new Date(e.at).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}</b> · ${esc(e.note||TYPES[e.type].label)}</li>`).join("")}</ul>`:""}
+  <div class="rp-two">
+    <div><h2>Coming up</h2>${upcoming.length?`<ul class="rp-list">${upcoming.map(x=>`<li><b>${new Date(x.at).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})}</b> · ${esc((AK[x.kind]||AK.other).label)}${x.vaccine?" ("+esc(x.vaccine)+")":""}${x.where?" · "+esc(x.where):""}</li>`).join("")}</ul>`:`<p class="rp-muted">No appointments in the next 30 days.</p>`}</div>
+    <div><h2>Supplies</h2><ul class="rp-list">${nd?`<li>Next delivery <b>${fmtR(nd)}</b></li>`:""}${toOrder.length?toOrder.map(x=>`<li><b>${esc(x.name)}</b> · ${Math.floor(x.left)} days left</li>`).join(""):`<li>Nothing needs ordering.</li>`}</ul></div>
+  </div>
+  <div class="rp-foot">Made with T1D Care Hub on ${fmtR(Date.now())}. This shows what happened; talk to his diabetes team before changing his pump settings.</div>`;
+}
+function renderReport(){ const el=$("#reportView"); if(!el || $("#v-reports").hidden) return; el.innerHTML = buildReport(); }
+["#rpPeriod","#rpFrom","#rpTo"].forEach(id => $(id).addEventListener("change", renderReport));
+function loadScript(src){ return new Promise((res, rej) => { if(document.querySelector(`script[src="${src}"]`)) return res(); const sc=document.createElement("script"); sc.src=src; sc.onload=res; sc.onerror=()=>rej(new Error("load")); document.head.appendChild(sc); }); }
+$("#rpPdf").addEventListener("click", async e => {
+  const btn=e.currentTarget, msg=$("#rpMsg"); btn.disabled=true; msg.textContent="Making the PDF…";
+  try {
+    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
+    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+    const holder=document.createElement("div"); holder.style.cssText="position:fixed;left:-10000px;top:0;width:794px;background:#fff";
+    holder.innerHTML=`<div class="report-paper print">${buildReport()}</div>`; document.body.appendChild(holder);
+    await new Promise(r=>setTimeout(r,60));
+    { // keep sections whole: push anything that would be cut by a page break onto the next page
+      const paper = holder.firstChild, pageH = Math.floor(794 * 842 / 595); let changed = true, guard = 0;
+      while(changed && guard++ < 40){ changed = false; const top0 = paper.getBoundingClientRect().top;
+        for(const el of [...paper.children]){ if(el.classList.contains("rp-gap")) continue; const r = el.getBoundingClientRect(), t = r.top-top0, bt = r.bottom-top0;
+          const pageEnd = (Math.floor(t/pageH)+1)*pageH; const isHead = el.tagName==="H2";
+          if((bt > pageEnd && r.height < pageH*0.9) || (isHead && t + 140 > pageEnd)){ const gap=document.createElement("div"); gap.className="rp-gap"; gap.style.height=(pageEnd - t + 24)+"px"; paper.insertBefore(gap, el); changed = true; break; } } }
+    }
+    const canvas = await window.html2canvas(holder.firstChild, {scale:2, backgroundColor:"#ffffff", useCORS:true, logging:false});
+    holder.remove();
+    const { jsPDF } = window.jspdf; const pdf = new jsPDF({unit:"pt", format:"a4"}); const pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight();
+    const imgH = canvas.height * pw / canvas.width; let y=0, page=0;
+    const sliceH = Math.floor(canvas.width * ph / pw);
+    while(y < canvas.height){ const c=document.createElement("canvas"); c.width=canvas.width; c.height=Math.min(sliceH, canvas.height-y);
+      c.getContext("2d").drawImage(canvas, 0, y, canvas.width, c.height, 0, 0, canvas.width, c.height);
+      if(page++) pdf.addPage(); pdf.addImage(c.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, pw, c.height*pw/canvas.width); y += sliceH; }
+    const blob = pdf.output("blob"); const [a] = rpRange();
+    const d = await getDownloads(); if(!d) throw Object.assign(new Error("Saving files isn't available here"),{code:"unavailable"});
+    const r = await d.save({filename:`T1D-report-${ymd(a)}.pdf`, data: blob}); msg.textContent = r.status==="saved" ? "PDF saved." : "";
+  } catch(err){ msg.textContent = err.code==="declined" ? "Cancelled." : err.message==="load" ? "Couldn't load the PDF maker. Check your internet connection." : (err.message || "Couldn't make the PDF."); }
+  finally { btn.disabled=false; }
 });
 
 /* ================= COMING DAYS: what's due + when to watch ================= */
