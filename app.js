@@ -15,7 +15,7 @@ let db = null, base = null, plan = {}, log = [], supplies = [];
 let canWrite = false, me = null, names = {}, userCap = null;
 
 /* ---------- views ---------- */
-const VIEWS = ["today","glucose","food","log","supplies","checks","sick","plan","backup"];
+const VIEWS = ["today","glucose","food","log","supplies","checks","appts","sick","plan","backup"];
 function route(){
   const v = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "today";
   VIEWS.forEach(n => $("#v-"+n).hidden = n !== v);
@@ -78,7 +78,7 @@ function renderHero(){ renderHeroRing();
   const chips=[["Site",site.v.replace(" left",""),site.cls],["Carbs",t.carbs+" g",""],["Drinks",t.ml+" ml",""],["Last ate",lf?new Date(lf.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):"—",""],["Hypos 7d",String(wk),wk>=3?"warn":""]];
   $("#heroChips").innerHTML = chips.map(([k,v,c])=>`<div class="hchip ${c}"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>`).join("");
 }
-function renderAll(){ renderHero(); renderStrip(); renderRecent(); renderFood(); renderLog(); renderSupplies(); renderSick(); renderItems(); renderGlucose(); renderChecks(); renderBackup(); renderMealPatterns(); renderComing(); }
+function renderAll(){ renderHero(); renderStrip(); renderRecent(); renderFood(); renderLog(); renderSupplies(); renderSick(); renderItems(); renderGlucose(); renderChecks(); renderBackup(); renderMealPatterns(); renderComing(); renderAppts(); }
 const dayKey = ms => new Date(ms).toDateString();
 function dayTotals(key){ const es = log.filter(e => dayKey(e.at)===key && (e.type==="food"||e.type==="drink"));
   return { carbs: es.reduce((a,e)=>a+(e.carbs||0),0), ml: es.filter(e=>e.type==="drink").reduce((a,e)=>a+(e.ml||0),0), meals: es.filter(e=>e.type==="food").length, drinks: es.filter(e=>e.type==="drink").length, es }; }
@@ -738,6 +738,102 @@ function renderInsights(st, days){
 }
 
 
+
+/* ================= APPOINTMENTS ================= */
+let appts = [];
+const AK = { diabetes:{label:"Diabetes clinic", chip:"blue"}, gp:{label:"GP", chip:""}, vaccine:{label:"Vaccination", chip:"ok"}, hospital:{label:"Hospital", chip:"urgent"},
+  dietitian:{label:"Dietitian", chip:"food"}, dentist:{label:"Dentist", chip:""}, eye:{label:"Eye / optician", chip:""}, health:{label:"Health visitor", chip:""}, other:{label:"Other", chip:""} };
+$("#ap_kind").innerHTML = Object.entries(AK).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join("");
+$("#apptFilter").innerHTML += Object.entries(AK).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join("");
+const apptWhen = a => a.at;
+function apptCard(a, past){
+  const d = new Date(a.at), k = AK[a.kind] || AK.other, days = Math.round((midnight(a.at)-midnight(Date.now()))/864e5);
+  const rel = a.status==="cancelled" ? "Cancelled" : past ? "" : days===0 ? "Today" : days===1 ? "Tomorrow" : days<0 ? "Overdue: mark done or cancelled" : `In ${days} days`;
+  return `<article class="appt ${a.status==="cancelled"?"cx":""}">
+    <div class="appt-date"><b>${d.getDate()}</b><span>${d.toLocaleDateString("en-GB",{month:"short"})}</span><small>${a.hasTime?d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):d.getFullYear()}</small></div>
+    <div class="appt-body"><div><span class="chip ${k.chip}">${k.label}</span>${a.kind==="vaccine"&&a.vaccine?`<strong>${esc(a.vaccine)}</strong>`:""}${rel?` <span class="muted appt-rel ${days<0&&!past?"bad":""}">${rel}</span>`:""}</div>
+      ${a.where||a.who?`<div class="muted">${esc([a.where,a.who].filter(Boolean).join(" · "))}</div>`:""}
+      ${a.notes?`<div class="appt-notes"><span class="muted">${past?"Notes":"To ask"}:</span> ${esc(a.notes)}</div>`:""}
+      ${a.outcome?`<div class="appt-notes"><span class="muted">Outcome:</span> ${esc(a.outcome)}</div>`:""}
+      <div class="btns">
+        ${!past&&a.status==="booked"?`<button class="small primary" data-adone="${esc(a.id)}">Mark done</button>`:""}
+        <button class="small" data-aedit="${esc(a.id)}" ${canWrite?"":"disabled"}>Edit</button>
+        ${!past&&a.status==="booked"?`<button class="small" data-aics="${esc(a.id)}">Add to calendar</button>`:""}
+        ${!past&&a.kind==="diabetes"?`<button class="small" data-aprep="${esc(a.id)}">Copy clinic prep</button>`:""}
+        <button class="small danger" data-adel="${esc(a.id)}" ${canWrite?"":"disabled"}>Delete</button>
+      </div></div></article>`;
+}
+function renderAppts(){
+  if(!$("#apptUpcoming")) return;
+  const now = Date.now(), today0 = midnight(now);
+  const up = appts.filter(a=>a.status==="booked" && a.at>=today0).sort((a,b)=>a.at-b.at);
+  const overdue = appts.filter(a=>a.status==="booked" && a.at<today0).sort((a,b)=>b.at-a.at);
+  const f = $("#apptFilter").value;
+  const past = appts.filter(a=>a.status!=="booked" && (!f || a.kind===f)).sort((a,b)=>b.at-a.at);
+  $("#apptUpcoming").innerHTML = (overdue.map(a=>apptCard(a,false)).join("") + up.map(a=>apptCard(a,false)).join("")) || `<div class="empty">No appointments booked. Tap <strong>Add appointment</strong> for his next GP, clinic or vaccination.</div>`;
+  $("#apptPast").innerHTML = past.length ? past.map(a=>apptCard(a,true)).join("") : `<div class="empty">Nothing here yet. When you mark an appointment done, it moves here with its outcome.</div>`;
+  const vax = appts.filter(a=>a.kind==="vaccine" && a.status==="done").sort((a,b)=>b.at-a.at);
+  $("#vaxTable").innerHTML = vax.length ? vax.map(a=>`<tr><td>${fmtD(a.at)}</td><td><strong>${esc(a.vaccine||"Vaccination")}</strong></td><td class="muted">${esc(a.where||"")}</td><td class="muted" style="overflow-wrap:anywhere">${esc(a.outcome||a.notes||"")}</td></tr>`).join("") : `<tr><td colspan="4"><div class="empty">No vaccinations recorded. Add past ones from his red book as appointments marked <strong>Done</strong>.</div></td></tr>`;
+  const next = up[0], nextDia = up.find(a=>a.kind==="diabetes"), lastVax = vax[0];
+  const inDays = a => { const d=Math.round((midnight(a.at)-today0)/864e5); return d===0?"Today":d===1?"Tomorrow":`In ${d} days`; };
+  $("#aStrip").innerHTML = [
+    `<div class="stat ${next && Math.round((midnight(next.at)-today0)/864e5)<=1?"warn":""}"><span class="k">Next appointment</span><span class="v">${next?inDays(next):"—"}</span><span class="n">${next?esc((AK[next.kind]||AK.other).label)+" · "+fmtD(next.at):"None booked"}</span></div>`,
+    `<div class="stat"><span class="k">Next diabetes clinic</span><span class="v">${nextDia?inDays(nextDia):"—"}</span><span class="n">${nextDia?fmtD(nextDia.at):"Not booked yet"}</span></div>`,
+    `<div class="stat"><span class="k">Last vaccination</span><span class="v">${lastVax?esc(lastVax.vaccine||"Vaccine"):"—"}</span><span class="n">${lastVax?fmtD(lastVax.at):"None recorded"}</span></div>`,
+    `<div class="stat ${overdue.length?"bad":""}"><span class="k">Need updating</span><span class="v">${overdue.length}</span><span class="n">${overdue.length?"Past dates still marked booked":"All up to date"}</span></div>`
+  ].join("");
+}
+const apptDlg = $("#apptDlg"); let editingAppt = null;
+function apptKindFields(){ document.querySelectorAll("#apptForm [data-ak]").forEach(el=>el.hidden = el.dataset.ak !== $("#ap_kind").value); }
+$("#ap_kind").addEventListener("change", apptKindFields);
+function openAppt(a, markDone){
+  if(!canWrite) return toast("Saving isn't switched on in this view");
+  editingAppt = a || null; $("#apptForm").reset();
+  $("#apptTitle").textContent = a ? (markDone ? "How did it go?" : "Edit appointment") : "Add appointment";
+  if(a){ const d=new Date(a.at); $("#ap_kind").value=a.kind; $("#ap_status").value=markDone?"done":a.status; $("#ap_date").value=ymd(a.at);
+    $("#ap_time").value = a.hasTime ? `${pad2(d.getHours())}:${pad2(d.getMinutes())}` : ""; $("#ap_vax").value=a.vaccine||""; $("#ap_where").value=a.where||""; $("#ap_who").value=a.who||""; $("#ap_notes").value=a.notes||""; $("#ap_outcome").value=a.outcome||""; }
+  else { $("#ap_kind").value="diabetes"; $("#ap_status").value="booked"; $("#ap_date").value=ymd(Date.now()+7*864e5); }
+  apptKindFields(); apptDlg.showModal(); if(markDone) setTimeout(()=>$("#ap_outcome").focus(),50);
+}
+$("#addAppt").addEventListener("click", ()=>openAppt());
+$("#apptCancel").addEventListener("click", ()=>apptDlg.close());
+$("#apptFilter").addEventListener("change", renderAppts);
+$("#apptForm").addEventListener("submit", async ev => { ev.preventDefault();
+  const [y,m,d] = $("#ap_date").value.split("-").map(Number); if(!y) return toast("Pick a date");
+  const t = $("#ap_time").value; const [hh,mm] = t ? t.split(":").map(Number) : [12,0];
+  const body = { kind:$("#ap_kind").value, status:$("#ap_status").value, at:new Date(y,m-1,d,hh,mm).getTime(), hasTime:!!t, vaccine:$("#ap_kind").value==="vaccine"?$("#ap_vax").value.trim():"",
+    where:$("#ap_where").value.trim(), who:$("#ap_who").value.trim(), notes:$("#ap_notes").value.trim(), outcome:$("#ap_outcome").value.trim(), by:me };
+  $("#apptSave").disabled = true;
+  try { editingAppt ? await base.collection("appts").doc(editingAppt.id).set(body) : await base.collection("appts").add(body); apptDlg.close(); toast("Saved"); }
+  catch(err){ toast(`Couldn't save (${err.code||err.message||"error"})`); } finally { $("#apptSave").disabled = false; }
+});
+function icsFor(a){
+  const d=new Date(a.at), z=n=>String(n).padStart(2,"0"), dt=x=>`${x.getFullYear()}${z(x.getMonth()+1)}${z(x.getDate())}`;
+  const start = a.hasTime ? `DTSTART:${dt(d)}T${z(d.getHours())}${z(d.getMinutes())}00` : `DTSTART;VALUE=DATE:${dt(d)}`;
+  const end = a.hasTime ? `DURATION:PT45M` : `DTEND;VALUE=DATE:${dt(new Date(a.at+864e5))}`;
+  const title = `${P("name")||"Son"}: ${(AK[a.kind]||AK.other).label}${a.vaccine?" ("+a.vaccine+")":""}`;
+  const esc2 = t => String(t||"").replace(/[\\,;]/g, m=>"\\"+m).replace(/\n/g,"\\n");
+  return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//T1D Care Hub//EN","BEGIN:VEVENT",`UID:${a.id}@t1d-care-hub`,`DTSTAMP:${new Date().toISOString().replace(/[-:]/g,"").slice(0,15)}Z`,start,end,
+    `SUMMARY:${esc2(title)}`, a.where?`LOCATION:${esc2(a.where)}`:"", `DESCRIPTION:${esc2([a.who?"With: "+a.who:"", a.notes?"To ask: "+a.notes:""].filter(Boolean).join("\n"))}`,
+    "BEGIN:VALARM","TRIGGER:-P1D","ACTION:DISPLAY","DESCRIPTION:Tomorrow: "+esc2(title),"END:VALARM",
+    ...(a.hasTime?["BEGIN:VALARM","TRIGGER:-PT2H","ACTION:DISPLAY","DESCRIPTION:In 2 hours: "+esc2(title),"END:VALARM"]:[]),
+    "END:VEVENT","END:VCALENDAR"].filter(Boolean).join("\r\n");
+}
+async function getDownloads(){ dl ??= await (window.claude?.use?.("downloads") ?? null); return dl; }
+document.addEventListener("click", async ev => {
+  const t = ev.target.closest("[data-adone],[data-aedit],[data-adel],[data-aics],[data-aprep]"); if(!t) return;
+  const id = t.dataset.adone||t.dataset.aedit||t.dataset.adel||t.dataset.aics||t.dataset.aprep; const a = appts.find(x=>x.id===id); if(!a) return;
+  if(t.dataset.adone) return openAppt(a, true);
+  if(t.dataset.aedit) return openAppt(a, false);
+  if(t.dataset.adel){ t.disabled=true; try { await deleteWithUndo("appts", id, "Appointment"); } catch { toast("Couldn't delete"); t.disabled=false; } return; }
+  if(t.dataset.aics){ const d = await getDownloads(); if(!d) return toast("Saving files isn't available here");
+    try { const r = await d.save({filename:`appointment-${ymd(a.at)}.ics`, data: icsFor(a)}); if(r.status==="saved") toast("Open the file to add it to your calendar"); }
+    catch(e){ toast(e.code==="declined"?"Cancelled":e.code==="rejected_extension"?"Calendar files can't be saved in this view. Use the installed app":"Couldn't create the calendar file"); } return; }
+  if(t.dataset.aprep){ renderLog(); const qs = [...document.querySelectorAll("#mealPatterns .mpq li")].map((li,i)=>`${i+1}. ${li.textContent}`);
+    const txt = `Clinic appointment ${fmtD(a.at)}${a.where?" at "+a.where:""}\n\n${$("#clinicText").textContent}${a.notes?`\n\nOur questions:\n${a.notes}`:""}${qs.length?`\n\nQuestions about meals:\n${qs.join("\n")}`:""}`;
+    try { await navigator.clipboard.writeText(txt); toast("Copied: paste it into an email to his team"); } catch { toast("Couldn't copy. Use History → Copy summary"); } }
+});
+
 /* ================= COMING DAYS: what's due + when to watch ================= */
 function dayLabel(ms){ const d=Math.round((midnight(ms)-midnight(Date.now()))/864e5); return d<0?"Overdue":d===0?"Today":d===1?"Tomorrow":new Date(ms).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"}); }
 function renderComing(){
@@ -749,6 +845,7 @@ function renderComing(){
   if(sensor){ const due=sensor.at+(num(plan.sensorDays)??10)*864e5; add(due, "Sensor change due", due<now?"bad":due-now<864e5?"warn":""); }
   supplyRows().forEach(sp=>{ if(!sp.days) return; const orderBy=now+Math.max(0,(sp.left-(sp.lead??14)))*864e5; add(orderBy, `Order ${sp.name} (${Math.floor(sp.left)} days left)`, sp.left<=(sp.lead??14)?"bad":"warn"); });
   ["eye","dental"].forEach(k=>{ const d=nextDue(k); if(d!=null && d<=now+30*864e5) items.push({at:d, text:`${CK[k].label} due`, cls:d<now?"bad":""}); });
+  appts.filter(a=>a.status==="booked" && a.at>=midnight(now) && a.at<=horizon).forEach(a=>items.push({at:a.at, text:`${(AK[a.kind]||AK.other).label}${a.vaccine?" ("+a.vaccine+")":""}${a.hasTime?" at "+new Date(a.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):""}${a.where?" · "+a.where:""}`, cls:""}));
   if(log.length>20 && (!lastBackup || now-lastBackup>30*864e5)) items.push({at:now, text:"Download a backup (Backup tab)", cls:"warn"});
   items.sort((a,b)=>a.at-b.at);
   ag.innerHTML = items.length ? items.map(i=>`<li><span class="when ${i.cls}">${dayLabel(i.at)}</span><span>${esc(i.text)}</span></li>`).join("")
@@ -932,7 +1029,7 @@ function renderBackup(){
 }
 $("#bkExport").addEventListener("click", async e => {
   const btn=e.currentTarget; if(!base) return bkStatus("Saving isn't available in this view.");
-  dl ??= await (window.claude?.use?.("downloads") ?? null);
+  await getDownloads();
   if(!dl){ bkStatus("Downloading files isn't available in this view. Try again from the installed app or a browser."); return; }
   btn.disabled=true; bkStatus("Collecting everything…");
   try {
@@ -1013,6 +1110,7 @@ renderAll();
   base.collection("log").orderBy("at","desc").limit(1000).onSnapshot(s => { log = s.docs.map(d => ({id:d.id, ...d.data()})); loadNames(); renderAll(); ok(s); }, fail);
   base.collection("cgm").orderBy("day","desc").limit(120).onSnapshot(s => { cgmDays = {}; s.docs.forEach(d => { const x=d.data(); if(x?.day && Array.isArray(x.pts)) cgmDays[x.day]=x; }); renderGlucose(); renderLog(); renderMealPatterns(); renderComing(); ok(s); }, fail);
   base.collection("growth").onSnapshot(s => { growth = s.docs.map(d => ({id:d.id, ...d.data()})); renderChecks(); renderStrip(); renderLog(); ok(s); }, fail);
+  base.collection("appts").onSnapshot(s => { appts = s.docs.map(d => ({id:d.id, ...d.data()})); renderAppts(); renderComing(); ok(s); }, fail);
   base.collection("checks").onSnapshot(s => { checks = s.docs.map(d => ({id:d.id, ...d.data()})); renderChecks(); renderStrip(); ok(s); }, fail);
   base.collection("meta").doc("backup").onSnapshot(s => { lastBackup = s.exists ? s.data().at : null; renderBackup(); renderStrip(); }, () => {});
   base.collection("supplies").onSnapshot(s => { supplies = s.docs.map(d => ({id:d.id, ...d.data()})); renderAll(); ok(s); }, fail);

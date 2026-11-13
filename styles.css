@@ -161,7 +161,7 @@ dialog h2{margin-bottom:6px}
 .toast{border-radius:12px;box-shadow:0 8px 24px rgb(0 0 0 / .2)}
 [hidden]{display:none!important}
 /* ===== navigation ===== */
-nav#nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:6;display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:4px;padding:6px;background:var(--surface);border-radius:16px;box-shadow:var(--shadow)}
+nav#nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:6;display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px;padding:6px;background:var(--surface);border-radius:16px;box-shadow:var(--shadow)}
 nav#nav a,nav#nav .more{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:0;padding:9px 4px;border-radius:12px;border:0;background:transparent;color:var(--muted);text-decoration:none;font:700 .8rem/1.15 var(--body);text-align:center}
 nav#nav a span,nav#nav .more span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 nav#nav a:hover:not([aria-current]),nav#nav .more:hover{background:var(--sunk);color:var(--fg)}
@@ -319,6 +319,16 @@ nav#nav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent)
   .hero-ring{display:none}
   .hero{border-radius:24px;padding:20px 18px}
 }
+.appt-list{display:grid;gap:10px}
+.appt{display:grid;grid-template-columns:64px minmax(0,1fr);gap:14px;padding:14px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
+.appt.cx{opacity:.6}
+.appt-date{align-self:start;display:grid;justify-items:center;align-content:start;background:var(--accent-soft);color:var(--accent);border-radius:14px;padding:8px 4px;gap:0}
+.appt-date b{font:600 1.5rem/1.1 var(--display)} .appt-date span{font:700 .75rem var(--body);text-transform:uppercase;letter-spacing:.06em} .appt-date small{font-size:.72rem;color:var(--muted);margin-top:2px}
+.appt-body{display:grid;gap:6px;min-width:0}
+.appt-body strong{margin-left:2px}
+.appt-rel{font-size:.85rem} .appt-rel.bad{color:var(--low);font-weight:700}
+.appt-notes{overflow-wrap:anywhere;font-size:.92rem}
+.appt .btns{margin-top:2px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
 /* ===== sign-in & family setup (family app) ===== */

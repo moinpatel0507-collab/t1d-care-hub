@@ -43,6 +43,7 @@ img{max-width:100%}
     <a href="#log" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg><span>History</span></a>
     <a href="#supplies" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5l9-4.5 9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></svg><span>Supplies</span></a>
     <a href="#checks" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11M10 20V5M16 20v-6M2 20h20"/><path d="M20 4v6M17 7h6"/></svg><span>Growth</span></a>
+    <a href="#appts" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h3"/></svg><span>Appointments</span></a>
     <a href="#sick" class="pri"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 17.5v-6"/></svg><span>Sick day</span></a>
     <a href="#plan" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zM9 11h6M9 15h4"/></svg><span>Care plan</span></a>
     <a href="#backup" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg><span>Backup</span></a>
@@ -53,6 +54,7 @@ img{max-width:100%}
       <a href="#log"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg><span>History</span></a>
       <a href="#supplies"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5l9-4.5 9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></svg><span>Supplies</span></a>
       <a href="#checks"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11M10 20V5M16 20v-6M2 20h20"/><path d="M20 4v6M17 7h6"/></svg><span>Growth</span></a>
+      <a href="#appts"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h3"/></svg><span>Appointments</span></a>
       <a href="#plan"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zM9 11h6M9 15h4"/></svg><span>Care plan</span></a>
       <a href="#backup"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg><span>Backup</span></a>
     </div>
@@ -225,6 +227,29 @@ img{max-width:100%}
     </div>
   </section>
 
+  <!-- APPOINTMENTS -->
+  <section id="v-appts" class="view" hidden>
+    <div class="strip" id="aStrip"></div>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end">
+        <div><h2>Upcoming</h2><div class="muted">GP, diabetes clinic, vaccinations, hospital, dentist and more. Add questions to ask before you go.</div></div>
+        <button class="primary" id="addAppt">Add appointment</button>
+      </div>
+      <div id="apptUpcoming" class="appt-list"></div>
+    </div>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end">
+        <div><h2>Past appointments</h2><div class="muted">What happened at each visit, so you have it next time.</div></div>
+        <select id="apptFilter" aria-label="Type"><option value="">All types</option></select>
+      </div>
+      <div id="apptPast" class="appt-list"></div>
+    </div>
+    <div class="panel">
+      <div><h2>Vaccinations</h2><div class="muted">Every vaccination marked as done. Check it against his red book.</div></div>
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Vaccine</th><th>Where</th><th>Notes</th></tr></thead><tbody id="vaxTable"></tbody></table></div>
+    </div>
+  </section>
+
   <!-- SICK DAY -->
   <section id="v-sick" class="view" hidden>
     <div class="panel">
@@ -343,6 +368,25 @@ img{max-width:100%}
     </div>
     <label>Result / notes<textarea id="c_note" placeholder="e.g. all fine, no fillings needed"></textarea></label>
     <div class="btns" style="justify-content:flex-end"><button type="button" id="chkCancel">Cancel</button><button class="primary" type="submit">Save</button></div>
+  </form>
+</dialog>
+
+<dialog id="apptDlg">
+  <form id="apptForm" method="dialog">
+    <h2 id="apptTitle">Appointment</h2>
+    <div class="grid2">
+      <label>Type<select id="ap_kind"></select></label>
+      <label>Status<select id="ap_status"><option value="booked">Booked</option><option value="done">Done</option><option value="cancelled">Cancelled</option></select></label>
+      <label>Date<input id="ap_date" type="date" required></label>
+      <label>Time<input id="ap_time" type="time"></label>
+      <label data-ak="vaccine" hidden>Vaccine<input id="ap_vax" list="vaxList" placeholder="e.g. Flu nasal spray"></label>
+      <label>Where<input id="ap_where" placeholder="e.g. Stratford Health Centre"></label>
+      <label>With<input id="ap_who" placeholder="e.g. Dr Patel, diabetes nurse"></label>
+    </div>
+    <datalist id="vaxList"><option value="Flu nasal spray"></option><option value="MMR"></option><option value="MMRV"></option><option value="4-in-1 pre-school booster"></option><option value="6-in-1"></option><option value="Pneumococcal"></option><option value="MenB"></option><option value="Hib/MenC"></option></datalist>
+    <label>Questions to ask / notes before<textarea id="ap_notes" placeholder="e.g. Ask about afternoon lows after nursery"></textarea></label>
+    <label>What happened / outcome<textarea id="ap_outcome" placeholder="Fill in after the visit: changes made, next steps, follow-up date"></textarea></label>
+    <div class="btns" style="justify-content:flex-end"><button type="button" id="apptCancel">Cancel</button><button class="primary" type="submit" id="apptSave">Save</button></div>
   </form>
 </dialog>
 
