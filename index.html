@@ -112,10 +112,18 @@ img{max-width:100%}
 
   <!-- SUPPLIES -->
   <section id="v-supplies" class="view" hidden>
+    <div class="strip" id="dStrip"></div>
+    <div class="panel" id="deliveryPanel">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end">
+        <div><h2>Deliveries</h2><div class="muted">Sensors, infusion sets and reservoirs arrive every few months. Check stock will last until the next box, and order in time.</div></div>
+        <div class="btns"><button class="primary" id="logDelivery">Log a delivery</button><button id="editDelivery">Delivery settings</button></div>
+      </div>
+      <div id="deliveryCheck"></div>
+    </div>
     <div class="panel">
       <div><h2>Supplies</h2><div class="muted">Days left = stock × days each unit lasts. Linked items count down when you log a site or sensor change.</div></div>
       <div class="table-wrap"><table>
-        <thead><tr><th>Item</th><th>In stock</th><th>Days left</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Item</th><th>In stock</th><th>Days left</th><th>Until next delivery</th><th>Status</th><th></th></tr></thead>
         <tbody id="supTable"></tbody>
       </table></div>
       <div class="btns"><button class="primary" id="addSup">Add item</button><button id="starterSup">Add common pump + CGM items</button></div>
@@ -391,6 +399,32 @@ img{max-width:100%}
   </form>
 </dialog>
 
+<dialog id="delSetDlg">
+  <form id="delSetForm" method="dialog">
+    <h2>Delivery settings</h2>
+    <p class="muted" style="margin:0 0 6px">How often his pump and sensor supplies arrive. You can change this any time.</p>
+    <div class="grid2">
+      <label>Last delivery arrived<input id="dl_last" type="date"></label>
+      <label>Arrives every <small>months</small><input id="dl_every" type="number" min="1" max="12" step="1" value="3"></label>
+      <label>Next delivery <small>only if you know the date</small><input id="dl_next" type="date"></label>
+      <label>Order / confirm <small>days before</small><input id="dl_lead" type="number" min="0" max="60" step="1" value="14"></label>
+      <label>Supplier <small>optional</small><input id="dl_who" placeholder="e.g. Medtronic home delivery"></label>
+      <label>Supplier phone <small>optional</small><input id="dl_phone" inputmode="tel"></label>
+    </div>
+    <div class="btns" style="justify-content:flex-end"><button type="button" id="delSetCancel">Cancel</button><button class="primary" type="submit">Save</button></div>
+  </form>
+</dialog>
+
+<dialog id="delLogDlg">
+  <form id="delLogForm" method="dialog">
+    <h2>Log a delivery</h2>
+    <p class="muted" style="margin:0 0 6px">Count what's in the box. These amounts are added to your stock.</p>
+    <label>Arrived on<input id="dlg_date" type="date"></label>
+    <div id="delItems" class="del-items"></div>
+    <div class="btns" style="justify-content:flex-end"><button type="button" id="delLogCancel">Cancel</button><button class="primary" type="submit" id="delLogSave">Add to stock</button></div>
+  </form>
+</dialog>
+
 <dialog id="supDlg">
   <form id="supForm" method="dialog">
     <h2>Supply item</h2>
@@ -399,6 +433,7 @@ img{max-width:100%}
       <label>In stock <small>units</small><input id="s_qty" type="number" min="0" step="1" required></label>
       <label>Each unit lasts <small>days</small><input id="s_days" type="number" min="0.1" step="0.1" required></label>
       <label>Reorder when <small>days left</small><input id="s_lead" type="number" min="0" step="1" value="14"></label>
+      <label>Usual amount per delivery <small>leave blank to work it out</small><input id="s_per" type="number" min="0" step="1"></label>
       <label>Counts down on<select id="s_link"><option value="">Nothing (update by hand)</option><option value="site">Site / pod change</option><option value="sensor">Sensor change</option></select></label>
     </div>
     <div class="btns" style="justify-content:flex-end"><button type="button" id="supCancel">Cancel</button><button class="primary" type="submit">Save item</button></div>

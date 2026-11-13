@@ -78,7 +78,7 @@ function renderHero(){ renderHeroRing();
   const chips=[["Site",site.v.replace(" left",""),site.cls],["Carbs",t.carbs+" g",""],["Drinks",t.ml+" ml",""],["Last ate",lf?new Date(lf.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):"—",""],["Hypos 7d",String(wk),wk>=3?"warn":""]];
   $("#heroChips").innerHTML = chips.map(([k,v,c])=>`<div class="hchip ${c}"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>`).join("");
 }
-function renderAll(){ renderHero(); renderStrip(); renderRecent(); renderFood(); renderLog(); renderSupplies(); renderSick(); renderItems(); renderGlucose(); renderChecks(); renderBackup(); renderMealPatterns(); renderComing(); renderAppts(); }
+function renderAll(){ renderHero(); renderStrip(); renderRecent(); renderFood(); renderLog(); renderSupplies(); renderSick(); renderItems(); renderGlucose(); renderChecks(); renderBackup(); renderMealPatterns(); renderComing(); renderAppts(); renderDeliveries(); }
 const dayKey = ms => new Date(ms).toDateString();
 function dayTotals(key){ const es = log.filter(e => dayKey(e.at)===key && (e.type==="food"||e.type==="drink"));
   return { carbs: es.reduce((a,e)=>a+(e.carbs||0),0), ml: es.filter(e=>e.type==="drink").reduce((a,e)=>a+(e.ml||0),0), meals: es.filter(e=>e.type==="food").length, drinks: es.filter(e=>e.type==="drink").length, es }; }
@@ -191,9 +191,11 @@ function renderSupplies(){
     <td><strong>${esc(s.name)}</strong>${s.link?`<div class="muted" style="font-size:.8rem">Counts down on ${s.link==="site"?"site change":"sensor change"}</div>`:""}</td>
     <td class="num"><div style="display:flex;gap:6px;align-items:center;justify-content:flex-end"><button class="small" data-dec="${esc(s.id)}" aria-label="One fewer" ${canWrite?"":"disabled"}>−</button><span style="min-width:2ch">${s.qty}</span><button class="small" data-inc="${esc(s.id)}" aria-label="One more" ${canWrite?"":"disabled"}>+</button></div></td>
     <td class="num">${Math.floor(s.left)}</td>
-    <td><span class="chip ${s.status==="OK"?"ok":s.status==="Order soon"?"high":"low"}">${s.status}</span></td>
+    <td>${untilDelivery(s)}</td>
+    <td>${(()=>{ const nd=nextDelivery(); const short = nd && s.days && Math.floor(s.left) < daysTo(nd);
+      const st = short && s.status==="OK" ? "Get extra" : s.status; return `<span class="chip ${st==="OK"?"ok":st==="Order soon"?"high":"low"}">${st}</span>`; })()}</td>
     <td style="text-align:right;white-space:nowrap"><button class="small" data-edit="${esc(s.id)}" ${canWrite?"":"disabled"}>Edit</button> <button class="small danger" data-sdel="${esc(s.id)}" ${canWrite?"":"disabled"}>Delete</button></td></tr>`).join("")
-    : `<tr><td colspan="5"><div class="empty">No supplies yet. Add the common items below, then set the real stock you have at home.</div></td></tr>`;
+    : `<tr><td colspan="6"><div class="empty">No supplies yet. Add the common items below, then set the real stock you have at home.</div></td></tr>`;
 }
 function renderSick(){
   const b = ketBand(num($("#ketIn").value), num($("#glIn").value), $("#vomIn").checked);
@@ -292,13 +294,13 @@ $("#logKet").addEventListener("click", () => openEntry("ketones", {ket:num($("#k
 /* ---------- supplies ---------- */
 const supDlg = $("#supDlg"); let editing = null;
 function openSup(s){ if(!canWrite) return (toast("Saving isn't switched on here. Open the page in a browser (see the note at the top)"), $("#dbNote").scrollIntoView({behavior:"smooth",block:"center"})); editing = s||null; $("#supForm").reset();
-  if(s){ $("#s_name").value=s.name; $("#s_qty").value=s.qty; $("#s_days").value=s.days; $("#s_lead").value=s.lead??14; $("#s_link").value=s.link||""; }
+  if(s){ $("#s_name").value=s.name; $("#s_qty").value=s.qty; $("#s_days").value=s.days; $("#s_lead").value=s.lead??14; $("#s_link").value=s.link||""; $("#s_per").value=s.per??""; }
   supDlg.showModal(); }
 $("#addSup").addEventListener("click", () => openSup());
 $("#supCancel").addEventListener("click", () => supDlg.close());
 $("#supForm").addEventListener("submit", async ev => {
   ev.preventDefault();
-  const d = { name:$("#s_name").value.trim(), qty:+$("#s_qty").value||0, days:+$("#s_days").value||1, lead:+$("#s_lead").value||0, link:$("#s_link").value };
+  const d = { name:$("#s_name").value.trim(), qty:+$("#s_qty").value||0, days:+$("#s_days").value||1, lead:+$("#s_lead").value||0, link:$("#s_link").value, per: $("#s_per").value==="" ? null : +$("#s_per").value };
   try { editing ? await base.collection("supplies").doc(editing.id).set(d) : await base.collection("supplies").add(d); supDlg.close(); toast("Saved"); }
   catch(err) { toast(`Couldn't save (${err.code||err.message||"error"})`); }
 });
@@ -739,6 +741,59 @@ function renderInsights(st, days){
 
 
 
+
+/* ================= DELIVERIES (supplies arriving every few months) ================= */
+let delivery = {};
+const dEvery = () => num(delivery.every) ?? 3;
+function nextDelivery(){ if(delivery.next && delivery.next >= midnight(Date.now())-864e5) return delivery.next; if(!delivery.last) return null; let n = addMonths(delivery.last, dEvery()); while(n < midnight(Date.now())) n = addMonths(n, dEvery()); return n; }
+const daysTo = ms => Math.round((midnight(ms)-midnight(Date.now()))/864e5);
+function perDelivery(sp){ if(sp.per!=null) return sp.per; if(!sp.days) return null; return Math.ceil(dEvery()*30.4/sp.days); }
+function untilDelivery(sp){
+  const nd = nextDelivery(); if(!nd || !sp.days) return `<span class="muted">—</span>`;
+  const spare = Math.floor(sp.left) - daysTo(nd);
+  return spare >= 7 ? `<span class="chip ok">Lasts · ${spare} d spare</span>` : spare >= 0 ? `<span class="chip high">Just enough · ${spare} d spare</span>` : `<span class="chip low">Runs out ${-spare} d early</span>`;
+}
+function renderDeliveries(){
+  if(!$("#dStrip")) return;
+  const nd = nextDelivery(), lead = num(delivery.lead) ?? 14;
+  const orderBy = nd ? nd - lead*864e5 : null;
+  const short = supplyRows().filter(sp => nd && sp.days && Math.floor(sp.left) < daysTo(nd));
+  $("#dStrip").innerHTML = [
+    `<div class="stat"><span class="k">Next delivery</span><span class="v">${nd?(daysTo(nd)===0?"Today":daysTo(nd)===1?"Tomorrow":"In "+daysTo(nd)+" days"):"—"}</span><span class="n">${nd?fmtD(nd):"Set the last delivery date"}</span></div>`,
+    `<div class="stat ${orderBy && daysTo(orderBy)<=3 ? (daysTo(orderBy)<0?"bad":"warn") : ""}"><span class="k">Order / confirm by</span><span class="v">${orderBy?(daysTo(orderBy)<0?"Overdue":daysTo(orderBy)===0?"Today":fmtD(orderBy).replace(/ \d{4}$/,"")):"—"}</span><span class="n">${orderBy?`${lead} days before delivery`:"Add delivery settings"}</span></div>`,
+    `<div class="stat ${short.length?"bad":""}"><span class="k">Will it last?</span><span class="v">${!nd?"—":short.length?short.length+" short":"Yes"}</span><span class="n">${!nd?"Needs a delivery date":short.length?esc(short.map(x=>x.name).slice(0,2).join(", ")):"Everything lasts until the next box"}</span></div>`,
+    `<div class="stat"><span class="k">Last delivery</span><span class="v">${delivery.last?fmtD(delivery.last).replace(/ \d{4}$/,""):"—"}</span><span class="n">${delivery.who?esc(delivery.who):"Every "+dEvery()+" months"}</span></div>`
+  ].join("");
+  $("#deliveryCheck").innerHTML = !delivery.last && !delivery.next
+    ? `<div class="empty">Tap <strong>Delivery settings</strong> and enter when the last box arrived. The app then works out the next delivery, when to order, and whether stock will last.</div>`
+    : short.length
+      ? `<div class="band low"><strong>Not enough to reach the next delivery</strong><span>${short.map(x=>`${esc(x.name)} runs out about ${daysTo(nd)-Math.floor(x.left)} days early`).join(" · ")}. Ask the supplier or GP for extra before ${fmtD(nd)}.${delivery.phone?` Supplier: <span style="user-select:all">${esc(delivery.phone)}</span>`:""}</span></div>`
+      : `<div class="band ok"><strong>Stock lasts until the next delivery</strong><span>Next box ${fmtD(nd)}${orderBy?`, order or confirm by ${fmtD(orderBy)}`:""}.${delivery.phone?` Supplier: <span style="user-select:all">${esc(delivery.phone)}</span>`:""}</span></div>`;
+}
+const delSetDlg = $("#delSetDlg"), delLogDlg = $("#delLogDlg");
+$("#editDelivery").addEventListener("click", () => { if(!canWrite) return toast("Saving isn't switched on in this view");
+  $("#dl_last").value = delivery.last ? ymd(delivery.last) : ""; $("#dl_every").value = dEvery(); $("#dl_next").value = delivery.next ? ymd(delivery.next) : "";
+  $("#dl_lead").value = num(delivery.lead) ?? 14; $("#dl_who").value = delivery.who || ""; $("#dl_phone").value = delivery.phone || ""; delSetDlg.showModal(); });
+$("#delSetCancel").addEventListener("click", () => delSetDlg.close());
+$("#delSetForm").addEventListener("submit", async ev => { ev.preventDefault();
+  const d = { last: $("#dl_last").value ? dateMs($("#dl_last").value) : null, every: +$("#dl_every").value || 3, next: $("#dl_next").value ? dateMs($("#dl_next").value) : null,
+    lead: +$("#dl_lead").value || 0, who: $("#dl_who").value.trim(), phone: $("#dl_phone").value.trim() };
+  try { await base.collection("meta").doc("delivery").set(d); delSetDlg.close(); toast("Saved"); } catch(err){ toast(`Couldn't save (${err.code||err.message||"error"})`); } });
+$("#logDelivery").addEventListener("click", () => { if(!canWrite) return toast("Saving isn't switched on in this view");
+  const rows = supplyRows(); if(!rows.length) return toast("Add your supply items first");
+  $("#dlg_date").value = ymd(Date.now());
+  $("#delItems").innerHTML = rows.map(sp => `<label class="del-row"><span><strong>${esc(sp.name)}</strong><small>${sp.qty} at home now</small></span><input type="number" min="0" step="1" data-dq="${esc(sp.id)}" value="${perDelivery(sp) ?? 0}" aria-label="Amount of ${esc(sp.name)}"></label>`).join("");
+  delLogDlg.showModal(); });
+$("#delLogCancel").addEventListener("click", () => delLogDlg.close());
+$("#delLogForm").addEventListener("submit", async ev => { ev.preventDefault(); $("#delLogSave").disabled = true;
+  try {
+    for(const inp of document.querySelectorAll("#delItems [data-dq]")){ const add = +inp.value || 0; if(!add) continue; const sp = supplies.find(x=>x.id===inp.dataset.dq); if(!sp) continue;
+      await base.collection("supplies").doc(sp.id).update({ qty: (sp.qty||0) + add, per: add }); }
+    const arrived = dateMs($("#dlg_date").value || ymd(Date.now()));
+    await base.collection("meta").doc("delivery").set({ ...delivery, last: arrived, next: null, every: dEvery() });
+    delLogDlg.close(); toast("Delivery added to stock");
+  } catch(err){ toast(`Couldn't save (${err.code||err.message||"error"})`); } finally { $("#delLogSave").disabled = false; } });
+
 /* ================= APPOINTMENTS ================= */
 let appts = [];
 const AK = { diabetes:{label:"Diabetes clinic", chip:"blue"}, gp:{label:"GP", chip:""}, vaccine:{label:"Vaccination", chip:"ok"}, hospital:{label:"Hospital", chip:"urgent"},
@@ -852,6 +907,7 @@ function renderComing(){
   if(sensor){ const due=sensor.at+(num(plan.sensorDays)??10)*864e5; add(due, "Sensor change due", due<now?"bad":due-now<864e5?"warn":""); }
   supplyRows().forEach(sp=>{ if(!sp.days) return; const orderBy=now+Math.max(0,(sp.left-(sp.lead??14)))*864e5; add(orderBy, `Order ${sp.name} (${Math.floor(sp.left)} days left)`, sp.left<=(sp.lead??14)?"bad":"warn"); });
   ["eye","dental"].forEach(k=>{ const d=nextDue(k); if(d!=null && d<=now+30*864e5) items.push({at:d, text:`${CK[k].label} due`, cls:d<now?"bad":""}); });
+  { const nd = nextDelivery(); if(nd){ const ob = nd - (num(delivery.lead) ?? 14)*864e5; add(ob, "Order / confirm supplies delivery", ob<now?"bad":"warn"); add(nd, "Supplies delivery due" + (delivery.who?" · "+delivery.who:"")); } }
   appts.filter(a=>a.status==="booked" && a.at>=midnight(now) && a.at<=horizon).forEach(a=>items.push({at:a.at, text:`${(AK[a.kind]||AK.other).label}${a.vaccine?" ("+a.vaccine+")":""}${a.hasTime?" at "+new Date(a.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):""}${a.where?" · "+a.where:""}`, cls:""}));
   if(log.length>20 && (!lastBackup || now-lastBackup>30*864e5)) items.push({at:now, text:"Download a backup (Backup tab)", cls:"warn"});
   items.sort((a,b)=>a.at-b.at);
@@ -1126,6 +1182,7 @@ renderAll();
   base.collection("growth").onSnapshot(s => { growth = s.docs.map(d => ({id:d.id, ...d.data()})); renderChecks(); renderStrip(); renderLog(); ok(s); }, fail);
   base.collection("appts").onSnapshot(s => { appts = s.docs.map(d => ({id:d.id, ...d.data()})); renderAppts(); renderChecks(); renderComing(); renderStrip(); ok(s); }, fail);
   base.collection("checks").onSnapshot(s => { checks = s.docs.map(d => ({id:d.id, ...d.data()})); renderChecks(); renderAppts(); renderStrip(); ok(s); }, fail);
+  base.collection("meta").doc("delivery").onSnapshot(s => { delivery = s.exists ? s.data() : {}; renderDeliveries(); renderSupplies(); renderComing(); }, () => {});
   base.collection("meta").doc("backup").onSnapshot(s => { lastBackup = s.exists ? s.data().at : null; renderBackup(); renderStrip(); }, () => {});
   base.collection("supplies").onSnapshot(s => { supplies = s.docs.map(d => ({id:d.id, ...d.data()})); renderAll(); ok(s); }, fail);
 })();
