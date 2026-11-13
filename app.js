@@ -216,13 +216,15 @@ function renderSick(){
 /* ---------- plan form ---------- */
 const PLAN_KEYS = ["name","dob","cgm","pump","hypo","ketAbove","siteDays","sensorDays","eyeMonths","dentalMonths","hypoTx","highTx","signs","glucagon","teamDay","teamOoh","notes"];
 let planDirty = false;
-function fillPlan(){ if(planDirty) return; PLAN_KEYS.forEach(k => { const el=$("#p_"+k); if(el) el.value = plan[k] ?? ""; }); }
-$("#planForm").addEventListener("input", () => planDirty = true);
+function fillPlan(){ if(planDirty) return planUi(); PLAN_KEYS.forEach(k => { const el=$("#p_"+k); if(el) el.value = plan[k] ?? ""; }); planUi(); }
+function planUi(){ const st=$("#planState"); if(st){ st.textContent = planDirty ? "Unsaved changes" : "All saved"; st.classList.toggle("dirty", planDirty); st.parentElement.classList.toggle("dirty", planDirty); }
+  document.querySelectorAll("[data-call]").forEach(a => { const v=($("#"+a.dataset.call).value||"").replace(/[^0-9+]/g,""); a.hidden = v.length<6; if(v) a.href="tel:"+v; }); }
+$("#planForm").addEventListener("input", () => { planDirty = true; planUi(); });
 $("#planForm").addEventListener("submit", async ev => {
   ev.preventDefault(); if(!base) return;
   const data = {}; PLAN_KEYS.forEach(k => data[k] = $("#p_"+k).value.trim());
   $("#savePlan").disabled = true;
-  try { await base.set({...data, updatedAt: Date.now()}); planDirty=false; plan=data; renderAll(); toast("Care plan saved"); }
+  try { await base.set({...data, updatedAt: Date.now()}); planDirty=false; plan=data; renderAll(); planUi(); toast("Care plan saved"); }
   catch(e){ toast(e.code==="quota_exceeded" ? "Storage is full" : `Couldn't save (${e.code||e.message||"error"}). Try again`); }
   finally { $("#savePlan").disabled = false; }
 });
@@ -346,7 +348,7 @@ $("#p_pump").addEventListener("change", () => {
   if(!$("#p_siteDays").value) $("#p_siteDays").value = pr.site;
   if(pr.cgm && !$("#p_cgm").value) $("#p_cgm").value = pr.cgm;
   if(pr.sensor && !$("#p_sensorDays").value) $("#p_sensorDays").value = pr.sensor;
-  planDirty = true; toast(pr.note + " Check with his team, then save.");
+  planDirty = true; planUi(); toast(pr.note + " Check with his team, then save.");
 });
 const isMedtronic = () => /medtronic|minimed|780g|640g/i.test(plan.pump||"");
 
