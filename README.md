@@ -1,4 +1,4 @@
-# T1D Care Hub — family app (upload version)
+# Lumo — family app (upload version)
 
 All files sit in ONE folder. No sub-folders, no npm, no build tools.
 
@@ -12,7 +12,7 @@ Vercel redeploys by itself after each commit. It needs two Environment Variables
 - `VITE_SUPABASE_ANON_KEY` = your anon / publishable key
 
 If you change them: Deployments → ⋯ → Redeploy.
-The build log should say **"T1D Care Hub built OK"**. If it says **MISSING FILES**, upload the files it names.
+The build log should say **"Lumo built OK"**. If it says **MISSING FILES**, upload the files it names.
 
 ## Database
 `schema.sql` is the Supabase setup script (SQL Editor → New query → paste → Run). Only needed once.

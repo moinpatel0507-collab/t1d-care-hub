@@ -304,7 +304,7 @@ nav#nav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent)
   .wrap{padding-left:calc(max(16px,env(safe-area-inset-left,0px)) + 244px)}
   nav#nav{position:fixed;top:calc(20px + env(safe-area-inset-top,0px));left:calc(max(0px,(100vw - 1440px) / 2) + max(16px,env(safe-area-inset-left,0px)));width:224px;
     display:flex;flex-direction:column;gap:2px;padding:14px;border-radius:24px;max-height:calc(100vh - 40px);overflow-y:auto}
-  nav#nav::before{content:"T1D Care Hub";font:600 1rem var(--display);color:var(--fg);padding:6px 12px 12px;border-bottom:1px solid var(--line);margin-bottom:8px}
+  nav#nav::before{content:"Lumo";font:600 1rem var(--display);color:var(--fg);padding:6px 12px 12px;border-bottom:1px solid var(--line);margin-bottom:8px}
   nav#nav a,nav#nav .more{flex-direction:row;justify-content:flex-start;gap:12px;padding:11px 12px;font-size:.95rem;border-radius:14px}
   nav#nav a span{overflow:visible}
   .hero .eyebrow,.hero .hero-top>.ring{display:none}

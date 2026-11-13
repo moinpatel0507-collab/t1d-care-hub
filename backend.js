@@ -132,7 +132,7 @@ const gate = document.createElement('div');
 gate.id = 'authGate';
 document.body.appendChild(gate);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-function screen(html) { gate.hidden = false; gate.innerHTML = `<div class="gate-card"><div class="gate-brand"><span class="ring"></span><span>T1D Care Hub</span></div>${html}</div>`; }
+function screen(html) { gate.hidden = false; gate.innerHTML = `<div class="gate-card"><div class="gate-brand"><span class="ring"></span><span>Lumo</span></div>${html}</div>`; }
 const msg = (t, bad) => { const m = gate.querySelector('.gate-msg'); if (m) { m.textContent = t; m.className = 'gate-msg' + (bad ? ' bad' : ''); } };
 
 const eye = (id) => `<button type="button" class="pwtoggle" data-for="${id}" aria-label="Show password">Show</button>`;
@@ -210,7 +210,7 @@ function showCode(code, onDone) {
     <button class="primary" type="button" id="goApp">Continue to the app</button><p class="gate-msg" aria-live="polite"></p></div>
     <p class="muted" style="font-size:.85rem">You can find it again any time in Care plan → Family &amp; account.</p>`);
   gate.querySelector('#cpCode').onclick = async () => { try { await navigator.clipboard.writeText(code); msg('Copied.'); } catch { msg('Copy it by hand: ' + code); } };
-  const sh = gate.querySelector('#shCode'); if (sh) sh.onclick = () => navigator.share({ text: `Join our T1D Care Hub. Open ${location.origin}, create an account, tap Join family and enter this code: ${code}` }).catch(() => {});
+  const sh = gate.querySelector('#shCode'); if (sh) sh.onclick = () => navigator.share({ text: `Join our Lumo. Open ${location.origin}, create an account, tap Join family and enter this code: ${code}` }).catch(() => {});
   gate.querySelector('#goApp').onclick = onDone;
 }
 function showFamilySetup() {
@@ -284,7 +284,7 @@ function addFamilyPanel() {
     <div class="btns"><button type="button" id="copyFam">Copy code</button>${navigator.share ? '<button type="button" id="shareFam">Share code</button>' : ''}<button type="button" id="signOut">Sign out</button></div>`;
   host.appendChild(p);
   p.querySelector('#copyFam').onclick = async () => { try { await navigator.clipboard.writeText(family?.invite_code || ''); } catch {} };
-  const sf = p.querySelector('#shareFam'); if (sf) sf.onclick = () => navigator.share({ text: `Join our T1D Care Hub. Open ${location.origin}, create an account, tap Join family and enter this code: ${family?.invite_code}` }).catch(() => {});
+  const sf = p.querySelector('#shareFam'); if (sf) sf.onclick = () => navigator.share({ text: `Join our Lumo. Open ${location.origin}, create an account, tap Join family and enter this code: ${family?.invite_code}` }).catch(() => {});
   p.querySelector('#signOut').onclick = async () => { await supabase.auth.signOut(); location.reload(); };
 }
 

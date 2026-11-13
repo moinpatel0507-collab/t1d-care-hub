@@ -1,4 +1,4 @@
-# T1D Care Hub: daily off-site backup
+# Lumo: daily off-site backup
 # Every night GitHub downloads everything from Supabase, locks it with your
 # backup password and keeps it for 90 days under Actions -> Daily backup.
 # Needs 3 repository secrets: SUPABASE_URL, SUPABASE_SECRET_KEY, BACKUP_PASSWORD.
@@ -46,7 +46,7 @@ jobs:
             const out = { app: 't1d-care-hub', version: 1, exportedAt: new Date().toISOString(), source: 'github-daily',
               plan: mine.find(r => r.collection === 'plan' && r.id === 'plan')?.data || {} };
             for (const c of COLS) out[c] = mine.filter(r => r.collection === c).map(r => ({ id: r.id, ...r.data }));
-            const name = `T1D-backup-${day}${fams.length > 1 ? '-family' + (n + 1) : ''}.json`;
+            const name = `Lumo-backup-${day}${fams.length > 1 ? '-family' + (n + 1) : ''}.json`;
             fs.writeFileSync(name, JSON.stringify(out));
             console.log(`${name}: ${out.log.length} log entries, ${out.cgm.length} CGM days, ${out.supplies.length} supplies, ${out.appts.length} appointments`);
           });
@@ -59,7 +59,7 @@ jobs:
           BACKUP_PASSWORD: ${{ secrets.BACKUP_PASSWORD }}
         run: |
           if [ -z "$BACKUP_PASSWORD" ]; then echo "::error::Add the BACKUP_PASSWORD secret."; exit 1; fi
-          for f in T1D-backup-*.json; do
+          for f in Lumo-backup-*.json; do
             openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -md sha256 -salt -in "$f" -out "$f.enc" -pass env:BACKUP_PASSWORD
             rm "$f"
           done
@@ -68,7 +68,7 @@ jobs:
       - name: Keep for 90 days
         uses: actions/upload-artifact@v4
         with:
-          name: T1D-backup-${{ env.DAY }}
+          name: Lumo-backup-${{ env.DAY }}
           path: '*.enc'
           retention-days: 90
           if-no-files-found: error
