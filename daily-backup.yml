@@ -1,0 +1,74 @@
+# T1D Care Hub: daily off-site backup
+# Every night GitHub downloads everything from Supabase, locks it with your
+# backup password and keeps it for 90 days under Actions -> Daily backup.
+# Needs 3 repository secrets: SUPABASE_URL, SUPABASE_SECRET_KEY, BACKUP_PASSWORD.
+# To restore: download the backup from the run page, then in the app open
+# Backup -> Restore from backup, pick the downloaded .zip and enter the password.
+name: Daily backup
+
+on:
+  schedule:
+    - cron: '47 3 * * *'      # 03:47 UTC every day
+  workflow_dispatch:          # lets you press "Run workflow" to test it
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download everything from Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          cat > backup.mjs <<'EOF'
+          const raw = (process.env.SUPABASE_URL || '').trim(), key = (process.env.SUPABASE_SECRET_KEY || '').trim();
+          if (!raw || !key) { console.error('::error::Add the SUPABASE_URL and SUPABASE_SECRET_KEY secrets (Settings -> Secrets and variables -> Actions).'); process.exit(1); }
+          const base = new URL(raw).origin;
+          const headers = { apikey: key, Accept: 'application/json' };
+          if (key.startsWith('eyJ')) headers.Authorization = 'Bearer ' + key;   // older "service_role" keys
+          const rows = [];
+          for (let off = 0; ; off += 1000) {
+            const r = await fetch(`${base}/rest/v1/records?select=family_id,collection,id,data&order=family_id,collection,id&limit=1000&offset=${off}`, { headers });
+            if (!r.ok) { console.error(`::error::Supabase said ${r.status}: ${(await r.text()).slice(0, 300)}`); process.exit(1); }
+            const page = await r.json(); rows.push(...page); if (page.length < 1000) break;
+          }
+          if (!rows.length) { console.error('::error::No records found. Is SUPABASE_SECRET_KEY the secret (not publishable) key?'); process.exit(1); }
+          const COLS = ['log', 'cgm', 'pump', 'growth', 'checks', 'supplies', 'appts'];
+          const fams = [...new Set(rows.map(r => r.family_id))];
+          const day = new Date().toISOString().slice(0, 10);
+          const fs = await import('fs');
+          fams.forEach((fid, n) => {
+            const mine = rows.filter(r => r.family_id === fid);
+            const out = { app: 't1d-care-hub', version: 1, exportedAt: new Date().toISOString(), source: 'github-daily',
+              plan: mine.find(r => r.collection === 'plan' && r.id === 'plan')?.data || {} };
+            for (const c of COLS) out[c] = mine.filter(r => r.collection === c).map(r => ({ id: r.id, ...r.data }));
+            const name = `T1D-backup-${day}${fams.length > 1 ? '-family' + (n + 1) : ''}.json`;
+            fs.writeFileSync(name, JSON.stringify(out));
+            console.log(`${name}: ${out.log.length} log entries, ${out.cgm.length} CGM days, ${out.supplies.length} supplies, ${out.appts.length} appointments`);
+          });
+          EOF
+          node backup.mjs
+          echo "DAY=$(date -u +%F)" >> "$GITHUB_ENV"
+
+      - name: Lock it with your backup password
+        env:
+          BACKUP_PASSWORD: ${{ secrets.BACKUP_PASSWORD }}
+        run: |
+          if [ -z "$BACKUP_PASSWORD" ]; then echo "::error::Add the BACKUP_PASSWORD secret."; exit 1; fi
+          for f in T1D-backup-*.json; do
+            openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -md sha256 -salt -in "$f" -out "$f.enc" -pass env:BACKUP_PASSWORD
+            rm "$f"
+          done
+          ls -la *.enc
+
+      - name: Keep for 90 days
+        uses: actions/upload-artifact@v4
+        with:
+          name: T1D-backup-${{ env.DAY }}
+          path: '*.enc'
+          retention-days: 90
+          if-no-files-found: error

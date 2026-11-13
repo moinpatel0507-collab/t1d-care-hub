@@ -1341,16 +1341,47 @@ $("#bkFile").addEventListener("change", async ev => {
   const f=ev.target.files[0]; ev.target.value=""; if(!f) return;
   if(!canWrite) return bkStatus("Saving isn't available in this view.");
   try {
-    const data = JSON.parse(await f.text());
-    if(data.app!=="t1d-care-hub" || !Array.isArray(data.log)) throw new Error("bad");
+    let bytes = new Uint8Array(await f.arrayBuffer());
+    if(bytes[0]===0x50 && bytes[1]===0x4b){   // a .zip (GitHub wraps its daily backups in one)
+      if(!window.JSZip) throw new Error("bad");
+      const zip = await JSZip.loadAsync(bytes); const names = Object.keys(zip.files).filter(n => !zip.files[n].dir && /\.(enc|json)$/i.test(n)).sort();
+      if(!names.length) throw new Error("bad");
+      bytes = await zip.files[names[names.length-1]].async("uint8array");
+    }
+    if(isEncrypted(bytes)) return askBackupPassword(bytes);
+    openRestore(JSON.parse(new TextDecoder().decode(bytes)));
+  } catch { bkStatus("That file isn't a T1D Care Hub backup."); }
+});
+/* daily GitHub backups are locked with your backup password (openssl AES-256-CBC, PBKDF2-SHA256) */
+const isEncrypted = b => b.length>16 && String.fromCharCode(...b.slice(0,8))==="Salted__";
+async function decryptBackup(bytes, password){
+  const salt = bytes.slice(8,16), body = bytes.slice(16);
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = new Uint8Array(await crypto.subtle.deriveBits({name:"PBKDF2", hash:"SHA-256", salt, iterations:200000}, base, 384));
+  const key = await crypto.subtle.importKey("raw", bits.slice(0,32), "AES-CBC", false, ["decrypt"]);
+  return new Uint8Array(await crypto.subtle.decrypt({name:"AES-CBC", iv:bits.slice(32,48)}, key, body));
+}
+function askBackupPassword(bytes){
+  const c = $("#bkConfirm"); c.hidden=false; bkStatus("");
+  c.innerHTML = `<strong>This backup is locked</strong><span>Enter the backup password you saved in GitHub (BACKUP_PASSWORD).</span><form id="bkPwForm" style="display:flex;gap:8px;flex-wrap:wrap"><input id="bkPw" type="password" autocomplete="off" placeholder="Backup password" style="flex:1 1 200px"><button class="primary" type="submit">Unlock</button><button type="button" id="bkNo">Cancel</button></form>`;
+  $("#bkNo").onclick = () => { c.hidden=true; };
+  $("#bkPw").focus();
+  $("#bkPwForm").onsubmit = async e => { e.preventDefault();
+    try { const plain = await decryptBackup(bytes, $("#bkPw").value); openRestore(JSON.parse(new TextDecoder().decode(plain))); }
+    catch { bkStatus("Wrong password, or the file is damaged."); }
+  };
+}
+function openRestore(data){
+  {
+    if(data.app!=="t1d-care-hub" || !Array.isArray(data.log)) return bkStatus("That file isn't a T1D Care Hub backup.");
     pendingRestore = data;
     const c = $("#bkConfirm"); c.hidden=false;
     c.innerHTML = `<strong>Restore backup from ${fmtD(Date.parse(data.exportedAt))}?</strong><span>It has ${data.log.length} log entries, ${(data.cgm||[]).length} days of CGM, ${(data.growth||[]).length} measurements, ${(data.checks||[]).length} check-ups and ${(data.supplies||[]).length} supplies. Anything missing here is added back and matching items are reset to the backup. Nothing else is deleted.</span><div class="btns"><button class="primary" type="button" id="bkGo">Restore now</button><button type="button" id="bkNo">Cancel</button></div>`;
     $("#bkNo").onclick = () => { pendingRestore=null; c.hidden=true; };
     $("#bkGo").onclick = doRestore;
     bkStatus("");
-  } catch { bkStatus("That file isn't a T1D Care Hub backup."); }
-});
+  }
+}
 async function doRestore(){
   const data=pendingRestore; if(!data) return; $("#bkConfirm").hidden=true; pendingRestore=null;
   const total = BK_COLS.reduce((a,c)=>a+(data[c]||[]).length,0); let n=0;

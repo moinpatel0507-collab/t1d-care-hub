@@ -30,6 +30,8 @@ const key = (col, id) => col + '/' + id;
 const meta = { fromCache: false, hasPendingWrites: false };
 const snapDoc = (col, id) => { const d = cache.get(key(col, id)); return { id, exists: !!d, data: () => d, metadata: meta }; };
 const notify = () => listeners.forEach(f => { try { f(); } catch (e) { console.error(e); } });
+let notifyTimer = null;   // live changes can arrive in bursts (e.g. a restore): redraw once
+const notifySoon = () => { clearTimeout(notifyTimer); notifyTimer = setTimeout(notify, 60); };
 const err = (e) => Object.assign(new Error(e?.message || 'Save failed'), { code: e?.code === '42501' ? 'not_granted' : (e?.code || 'unavailable') });
 
 async function writeRow(col, id, data) {
@@ -43,9 +45,9 @@ function docRef(path) {
   return {
     id, path,
     async get() { return snapDoc(col, id); },
-    async set(data) { const prev = cache.get(key(col, id)); cache.set(key(col, id), JSON.parse(JSON.stringify(data))); notify(); try { await writeRow(col, id, data); } catch (e) { prev ? cache.set(key(col, id), prev) : cache.delete(key(col, id)); notify(); throw e; } },
+    async set(data) { const prev = cache.get(key(col, id)); cache.set(key(col, id), JSON.parse(JSON.stringify(data))); notifySoon(); try { await writeRow(col, id, data); } catch (e) { prev ? cache.set(key(col, id), prev) : cache.delete(key(col, id)); notifySoon(); throw e; } },
     async update(data) { const merged = { ...(cache.get(key(col, id)) || {}), ...data }; return this.set(merged); },
-    async delete() { const prev = cache.get(key(col, id)); cache.delete(key(col, id)); notify(); const { error } = await supabase.from('records').delete().match({ family_id: familyId, collection: col, id }); if (error) { if (prev) cache.set(key(col, id), prev); notify(); throw err(error); } },
+    async delete() { const prev = cache.get(key(col, id)); cache.delete(key(col, id)); notifySoon(); const { error } = await supabase.from('records').delete().match({ family_id: familyId, collection: col, id }); if (error) { if (prev) cache.set(key(col, id), prev); notifySoon(); throw err(error); } },
     onSnapshot(next) { const f = () => next(snapDoc(col, id)); listeners.add(f); queueMicrotask(f); return () => listeners.delete(f); },
     collection(sub) { return colRef(path + '/' + sub); },
   };
@@ -89,7 +91,7 @@ function subscribe() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'records', filter: 'family_id=eq.' + familyId }, (p) => {
       if (p.eventType === 'DELETE') { const o = p.old || {}; if (o.collection) cache.delete(key(o.collection, o.id)); }
       else { const n = p.new; cache.set(key(n.collection, n.id), n.data); }
-      notify();
+      notifySoon();
     })
     .subscribe();
   // phones pause background connections: refresh when the app comes back
@@ -254,7 +256,7 @@ async function start() {
   members = all || [];
   try { await loadAll(); } catch (e) { screen(`<h1>Couldn't load your data</h1><p class="muted">${esc(e.message)}</p><button class="primary" onclick="location.reload()">Try again</button>`); return; }
   gate.hidden = true; gate.innerHTML = '';
-  if (!started) { started = true; subscribe(); addFamilyPanel(); addAccountChip(); readyResolve(); }
+  if (!started) { started = true; subscribe(); addFamilyPanel(); addAccountChip(); addAutoBackupPanel(); readyResolve(); }
 }
 function addAccountChip() {
   const top = document.querySelector('.hero-top'); if (!top || document.getElementById('acct')) return;
@@ -284,6 +286,89 @@ function addFamilyPanel() {
   p.querySelector('#copyFam').onclick = async () => { try { await navigator.clipboard.writeText(family?.invite_code || ''); } catch {} };
   const sf = p.querySelector('#shareFam'); if (sf) sf.onclick = () => navigator.share({ text: `Join our T1D Care Hub. Open ${location.origin}, create an account, tap Join family and enter this code: ${family?.invite_code}` }).catch(() => {});
   p.querySelector('#signOut').onclick = async () => { await supabase.auth.signOut(); location.reload(); };
+}
+
+/* ---------------- automatic daily backups (see supabase/backup-setup.sql) ---------------- */
+const ukDay = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: 'Europe/London' });   // YYYY-MM-DD
+const niceDay = (day) => { const t = ukDay(), y = ukDay(new Date(Date.now() - 864e5)); return day === t ? 'Today' : day === y ? 'Yesterday' : new Date(day + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }); };
+const hhmm = (iso) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
+let abState = { list: null, missing: false, busy: '', msg: '' };
+async function listBackups() {
+  const { data, error } = await supabase.from('backups').select('day,created_at,items').eq('family_id', familyId).order('day', { ascending: false }).limit(31);
+  if (error) { if (/backups|does not exist|schema cache|42P01|PGRST205/i.test(error.message + error.code)) { abState.missing = true; abState.list = []; return; } throw error; }
+  abState.missing = false; abState.list = data || [];
+}
+async function backupNow() {
+  const { data, error } = await supabase.rpc('backup_now');
+  if (error) throw error;
+  return data;
+}
+async function dailyBackupCheck() {
+  try {
+    await listBackups();
+    if (abState.missing) return renderAutoBackup();
+    const hasData = [...cache.keys()].some(k => !k.startsWith('meta/'));
+    if (hasData && abState.list[0]?.day !== ukDay()) { await backupNow(); await listBackups(); }
+  } catch (e) { console.warn('daily backup', e); }
+  renderAutoBackup();
+}
+function renderAutoBackup() {
+  const p = document.getElementById('autoBk'); if (!p) return;
+  const L = abState.list;
+  let body;
+  if (L === null) body = '<p class="muted">Checking backups…</p>';
+  else if (abState.missing) body = `<div class="band high"><strong>Automatic backups aren't switched on yet</strong><span>In Supabase, open <b>SQL Editor → New query</b>, paste the file <code>backup-setup.sql</code> from your GitHub folder and press <b>Run</b>. Then reopen this page.</span></div>`;
+  else if (!L.length) body = '<p class="muted">No backups yet. The first one is made automatically once there is something to save.</p>';
+  else body = `<ul class="ab-list">${L.map((b, i) => `<li><span class="ab-day"><b>${niceDay(b.day)}</b><small>${hhmm(b.created_at)} · ${Number(b.items).toLocaleString('en-GB')} item${b.items == 1 ? '' : 's'}</small></span>${i === 0 ? '<span class="chip ok">Latest</span>' : ''}<button type="button" class="small" data-abr="${b.day}">Restore</button></li>`).join('')}</ul>`;
+  p.querySelector('.ab-body').innerHTML = body;
+  const st = p.querySelector('.ab-status'); st.hidden = !abState.msg; st.innerHTML = abState.msg;
+  p.querySelector('#abNow').disabled = !!abState.busy || abState.missing;
+  p.querySelector('#abNow').textContent = abState.busy === 'now' ? 'Backing up…' : 'Back up now';
+  p.querySelectorAll('[data-abr]').forEach(b => { b.disabled = !!abState.busy; b.onclick = () => askRestore(b.dataset.abr); });
+}
+function askRestore(day) {
+  abState.msg = `<strong>Restore the backup from ${niceDay(day)}?</strong> Anything deleted since then comes back, and items changed since then go back to how they were. Entries added after it are kept.
+    <div class="btns" style="margin-top:8px"><button type="button" class="primary" id="abGo">Restore ${niceDay(day).toLowerCase()}'s backup</button><button type="button" id="abNo">Cancel</button></div>`;
+  renderAutoBackup();
+  document.getElementById('abNo').onclick = () => { abState.msg = ''; renderAutoBackup(); };
+  document.getElementById('abGo').onclick = () => restoreBackup(day);
+}
+async function restoreBackup(day) {
+  abState.busy = 'restore'; abState.msg = 'Getting the backup…'; renderAutoBackup();
+  try {
+    try { await backupNow(); } catch {}   // keep today's state too, so a restore can be undone
+    const { data, error } = await supabase.from('backups').select('data').eq('family_id', familyId).eq('day', day).limit(1);
+    if (error) throw error;
+    const rows = (data?.[0]?.data || []).filter(r => r && r.c && r.i != null);
+    const now = new Date().toISOString();
+    for (let i = 0; i < rows.length; i += 400) {
+      const chunk = rows.slice(i, i + 400).map(r => ({ family_id: familyId, collection: r.c, id: String(r.i), data: r.d, updated_by: me, updated_at: now }));
+      const { error: e2 } = await supabase.from('records').upsert(chunk, { onConflict: 'family_id,collection,id' });
+      if (e2) throw e2;
+      abState.msg = `Restoring… ${Math.min(i + 400, rows.length)} of ${rows.length}`; renderAutoBackup();
+    }
+    await loadAll();
+    abState.msg = `Restored ${rows.length.toLocaleString('en-GB')} items from ${niceDay(day).toLowerCase()}'s backup. Today's state was saved first, so you can go back to it from the list.`;
+    await listBackups();
+  } catch (e) { abState.msg = `Restore didn't finish: ${esc(e.message || e)}. Nothing was deleted. Try again.`; }
+  abState.busy = ''; renderAutoBackup();
+}
+function addAutoBackupPanel() {
+  const host = document.querySelector('#v-backup'); if (!host || document.getElementById('autoBk')) return;
+  const p = document.createElement('div'); p.className = 'panel'; p.id = 'autoBk';
+  p.innerHTML = `<div><h2>Automatic daily backups</h2><div class="muted">Made every night, and when either of you first opens the app each day. The last 30 days are kept online. Restore any day here.</div></div>
+    <div class="ab-body"></div><div class="ab-status notice" hidden></div>
+    <div class="btns"><button type="button" id="abNow">Back up now</button></div>`;
+  const head = host.querySelector('.view-head'); host.insertBefore(p, head ? head.nextSibling : host.firstChild);
+  p.querySelector('#abNow').onclick = async () => {
+    abState.busy = 'now'; abState.msg = ''; renderAutoBackup();
+    try { const n = await backupNow(); await listBackups(); abState.msg = `Backed up ${Number(n).toLocaleString('en-GB')} items.`; }
+    catch (e) { abState.msg = `Couldn't back up: ${esc(e.message || e)}`; }
+    abState.busy = ''; renderAutoBackup();
+  };
+  renderAutoBackup();
+  dailyBackupCheck();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && abState.list && !abState.missing && abState.list[0]?.day !== ukDay()) dailyBackupCheck(); });
 }
 
 if (!supabase) {
