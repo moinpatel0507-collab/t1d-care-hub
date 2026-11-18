@@ -1041,13 +1041,44 @@ nav#nav .nav-ver{display:none}
 .trip-opts{display:flex;gap:18px;flex-wrap:wrap}
 
 /* ===== sign-in & family setup (family app) ===== */
-#authGate{position:fixed;inset:0;z-index:100;background:var(--bg);overflow-y:auto;display:grid;place-items:start center;padding:max(24px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
-.gate-card{width:min(460px,100%);margin-top:6vh;background:var(--surface);border-radius:22px;box-shadow:var(--shadow);padding:26px 22px;display:grid;gap:14px}
-.gate-brand{display:flex;align-items:center;gap:10px;font:700 .8rem var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
-.gate-brand .ring{width:22px;height:22px;border:5px solid var(--accent);border-radius:50%}
-.gate-card h1{font:700 1.6rem/1.15 var(--display);margin:0}
+#authGate{position:fixed;inset:0;z-index:100;overflow-y:auto;display:flex;flex-direction:column;padding:max(20px,env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-right,0px)) 24px max(14px,env(safe-area-inset-left,0px));
+  background:radial-gradient(90% 60% at 100% 0%, color-mix(in srgb,#4338CA 14%,transparent), transparent 70%), radial-gradient(70% 50% at 0% 100%, color-mix(in srgb,#127174 12%,transparent), transparent 70%), var(--bg)}
+.gate-shell{margin:auto;flex:none;width:min(980px,100%);display:grid;grid-template-columns:1fr;background:var(--surface);border-radius:28px;overflow:hidden;box-shadow:0 1px 2px rgb(16 24 40 / .06), 0 24px 60px -12px rgb(16 24 40 / .18);border:1px solid var(--line)}
+.gate-hero{position:relative;overflow:hidden;color:#fff;padding:22px 22px 24px;display:grid;gap:14px;align-content:start;
+  background:radial-gradient(120% 90% at 0% 0%, #1a7276 0%, transparent 55%), linear-gradient(155deg,#0b4547 0%,#24306f 55%,#4338CA 100%)}
+.gh-rings{position:absolute;right:-60px;top:-40px;width:340px;height:340px;color:#fff;pointer-events:none}
+.gh-top{position:relative;display:flex;align-items:center;gap:12px;font:700 .95rem var(--display);letter-spacing:.01em}
+.gh-top img{width:40px;height:40px;border-radius:11px;box-shadow:0 6px 16px rgb(0 0 0 / .25)}
+.gh-main{position:relative;display:grid;gap:18px}
+.gate-hero h2{font:700 1.45rem/1.15 var(--display);margin:0;max-width:16ch}
+.gh-list,.gh-foot{display:none}
+.gh-list{list-style:none;margin:0;padding:0;gap:12px;font-size:.98rem}
+.gh-list li{display:flex;align-items:center;gap:12px}
+.gh-list i{width:26px;height:26px;flex:none;border-radius:50%;background:rgb(255 255 255 / .14);position:relative}
+.gh-list i::after{content:"";position:absolute;left:9px;top:6px;width:6px;height:11px;border:solid #9ff0e6;border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+.gh-foot{position:relative;margin:0;font-size:.8rem;color:rgb(255 255 255 / .7)}
+.gate-card{padding:26px 22px 24px;display:grid;gap:16px;align-content:center}
+.gate-head{display:grid;gap:6px}
+.gate-kicker{font:700 .72rem var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.gate-card h1{font:700 1.7rem/1.15 var(--display);margin:0}
 .gate-card h2{font-size:1rem;margin:0 0 6px}
 .gate-card p{margin:0}
+@media (min-width:900px){
+  .gate-shell{grid-template-columns:1.05fr 1fr;min-height:600px}
+  .gate-hero{padding:40px 40px 34px;align-content:space-between}
+  .gate-hero h2{font-size:2.3rem}
+  .gh-list{display:grid}.gh-foot{display:block}
+  .gh-rings{width:460px;height:460px;right:-120px;top:-80px}
+  .gate-card{padding:48px 46px}
+  .gate-card h1{font-size:2rem}
+}
+.gate-form label{display:grid;gap:7px;font-weight:600}
+.gate-form input{min-height:50px;font-size:1rem;border-radius:14px}
+.gate-form .gate-forgot{justify-self:end;margin-top:-4px;font-size:.88rem}
+.gate-go{min-height:52px;font-size:1rem;margin-top:2px;box-shadow:0 8px 20px -8px color-mix(in srgb,var(--accent) 70%,transparent)}
+.gate-alt{display:block;text-align:center;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:.95rem}
+.gate-alt .linkbtn{display:inline;padding:0 2px;font-size:inherit}
+.gate-alt small{display:block;margin:6px auto 0;font-size:.78rem;max-width:36ch}
 .gate-form{display:grid;gap:12px}
 .gate-form button.primary,.gate-split button{width:100%;padding:12px}
 .gate-split{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -1061,9 +1092,10 @@ nav#nav .nav-ver{display:none}
 .gate-tabs{display:grid;grid-template-columns:1fr 1fr;background:var(--sunk);border-radius:999px;padding:4px;gap:4px}
 .gate-tabs button{border:0;background:transparent;border-radius:999px;padding:9px;color:var(--muted)}
 .gate-tabs button.on{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgb(0 0 0 / .08)}
-.pwrow{display:flex;gap:6px;align-items:center}
-.pwrow input{flex:1;min-width:0}
-.pwtoggle{padding:9px 12px;font-size:.8rem;flex:none}
+.pwrow{position:relative;display:block}
+.pwrow input{width:100%;padding-right:76px}
+.pwtoggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);padding:8px 12px;font-size:.8rem;min-height:0;background:transparent;border:0;color:var(--accent);font-weight:700}
+.pwtoggle:hover{background:var(--sunk)}
 .codebox{display:flex;justify-content:center;gap:4px;flex-wrap:nowrap;margin:6px 0}
 .codebox span{font:600 1.4rem/1 var(--mono);width:34px;height:46px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);border-radius:12px}
 @media (max-width:380px){.codebox span{width:29px;height:40px;font-size:1.15rem}}

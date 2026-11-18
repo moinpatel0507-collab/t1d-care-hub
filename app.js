@@ -1295,7 +1295,7 @@ applyNight(); setInterval(applyNight, 60000); document.addEventListener("visibil
 
 
 /* ---------- version ---------- */
-const APP_VERSION = "6.1";
+const APP_VERSION = "6.2";
 document.querySelectorAll(".ver-n").forEach(e => e.textContent = APP_VERSION);
 { const nav=$("#nav"); if(nav && !nav.querySelector(".app-ver")){ const d=document.createElement("div"); d.className="app-ver nav-ver"; d.textContent="Version "+APP_VERSION; nav.insertBefore(d, $("#moreBtn")); } }
 

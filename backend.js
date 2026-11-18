@@ -200,7 +200,14 @@ const gate = document.createElement('div');
 gate.id = 'authGate';
 document.body.appendChild(gate);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-function screen(html) { gate.hidden = false; gate.innerHTML = `<div class="gate-card"><div class="gate-brand"><span class="ring"></span><span>T1D Care Hub</span></div>${html}</div>`; }
+const GATE_HERO = `<aside class="gate-hero" aria-hidden="true">
+  <svg class="gh-rings" viewBox="0 0 400 400"><circle cx="300" cy="90" r="150" fill="none" stroke="currentColor" stroke-width="2" opacity=".14"/><circle cx="300" cy="90" r="105" fill="none" stroke="currentColor" stroke-width="10" stroke-dasharray="420 300" stroke-linecap="round" opacity=".18"/></svg>
+  <div class="gh-top"><img src="/icon-192.png" alt="" width="44" height="44" onerror="this.remove()"><span>T1D Care Hub</span></div>
+  <div class="gh-main"><h2>His day, in one calm place.</h2>
+    <ul class="gh-list"><li><i></i>Food, hypos, sites and supplies</li><li><i></i>Shared live between your two phones</li><li><i></i>Works without signal</li><li><i></i>Private to your family</li></ul></div>
+  <p class="gh-foot">Made for the two of you. Not medical advice: follow his diabetes team's plan.</p>
+</aside>`;
+function screen(html) { gate.hidden = false; gate.innerHTML = `<div class="gate-shell">${GATE_HERO}<div class="gate-card">${html}</div></div>`; }
 const msg = (t, bad) => { const m = gate.querySelector('.gate-msg'); if (m) { m.textContent = t; m.className = 'gate-msg' + (bad ? ' bad' : ''); } };
 
 const eye = (id) => `<button type="button" class="pwtoggle" data-for="${id}" aria-label="Show password">Show</button>`;
@@ -209,20 +216,21 @@ function wirePwToggles(){ gate.querySelectorAll('.pwtoggle').forEach(b => b.oncl
 function showSignIn(mode = 'in') {
   if (mode === 'reset') return showForgot();
   const up = mode === 'up';
-  screen(`<div class="gate-tabs" role="tablist"><button type="button" role="tab" class="${up?'':'on'}" id="tabIn">Sign in</button><button type="button" role="tab" class="${up?'on':''}" id="tabUp">Register</button></div>
+  screen(`<div class="gate-head"><span class="gate-kicker">${up ? 'New account' : 'Sign in'}</span>
     <h1>${up ? 'Create your account' : 'Welcome back'}</h1>
-    <p class="muted">${up ? 'One account each for you and his mum. After this you create the family, or join it with a family code.' : 'Sign in to see his care hub.'}</p>
+    <p class="muted">${up ? 'One account each for you and his mum. Next you create the family, or join it with a family code.' : 'Sign in to see how his day is going.'}</p></div>
     <form id="authForm" class="gate-form" novalidate>
-      <label>Email<input id="a_email" type="email" autocomplete="email" inputmode="email" required></label>
-      <label>Password ${up?'<small>at least 8 characters</small>':''}<span class="pwrow"><input id="a_pass" type="password" autocomplete="${up ? 'new-password' : 'current-password'}" minlength="8" required>${eye('a_pass')}</span></label>
-      ${up ? `<label>Confirm password<span class="pwrow"><input id="a_pass2" type="password" autocomplete="new-password" minlength="8" required>${eye('a_pass2')}</span></label>` : ''}
-      <button class="primary" type="submit">${up ? 'Create account' : 'Sign in'}</button>
+      <label>Email<input id="a_email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" required></label>
+      <label>Password ${up?'<small>at least 8 characters</small>':''}<span class="pwrow"><input id="a_pass" type="password" autocomplete="${up ? 'new-password' : 'current-password'}" minlength="8" placeholder="${up ? 'Choose a password' : 'Your password'}" required>${eye('a_pass')}</span></label>
+      ${up ? `<label>Confirm password<span class="pwrow"><input id="a_pass2" type="password" autocomplete="new-password" minlength="8" placeholder="Type it again" required>${eye('a_pass2')}</span></label>` : '<button type="button" class="linkbtn gate-forgot" id="forgot">Forgot password?</button>'}
+      <button class="primary gate-go" type="submit">${up ? 'Create account' : 'Sign in'}</button>
       <p class="gate-msg" aria-live="polite"></p>
     </form>
-    ${up ? '' : '<button type="button" class="linkbtn" id="forgot">Forgot your password?</button>'}`);
+    <div class="gate-alt">${up ? 'Already have an account? <button type="button" class="linkbtn" id="tabIn">Sign in</button>' : 'New here? <button type="button" class="linkbtn" id="tabUp">Create an account</button><small>New accounts may be switched off. Ask the first parent if it doesn\'t work.</small>'}</div>`);
   wirePwToggles();
-  gate.querySelector('#tabIn').onclick = () => showSignIn('in');
-  gate.querySelector('#tabUp').onclick = () => showSignIn('up');
+  const ti = gate.querySelector('#tabIn'), tu = gate.querySelector('#tabUp');
+  if (ti) ti.onclick = () => showSignIn('in');
+  if (tu) tu.onclick = () => showSignIn('up');
   if (!up) gate.querySelector('#forgot').onclick = () => showForgot(gate.querySelector('#a_email').value.trim());
   gate.querySelector('#authForm').onsubmit = async (e) => {
     e.preventDefault();
@@ -234,7 +242,7 @@ function showSignIn(mode = 'in') {
     msg(up ? 'Creating your account…' : 'Signing in…');
     const { data, error } = up ? await supabase.auth.signUp({ email, password, options: { emailRedirectTo: location.origin } }) : await supabase.auth.signInWithPassword({ email, password });
     btn.disabled = false;
-    if (error) return msg(/invalid login/i.test(error.message) ? 'Wrong email or password. Try again, or reset your password.' : /already registered/i.test(error.message) ? 'That email already has an account. Sign in instead.' : error.message, true);
+    if (error) return msg(/invalid login/i.test(error.message) ? 'Wrong email or password. Try again, or reset your password.' : /already registered/i.test(error.message) ? 'That email already has an account. Sign in instead.' : /signups? not allowed|signup.*disabled/i.test(error.message) ? 'New accounts are switched off. Ask the first parent to add you.' : error.message, true);
     if (up && !data.session) {
       screen(`<h1>Check your email</h1><p class="muted">We sent a confirmation link to <strong>${esc(email)}</strong>. Tap it, then come back here and sign in.</p><p class="muted">Can't find it? Check your spam folder.</p><button class="primary" id="toIn">Go to sign in</button>`);
       gate.querySelector('#toIn').onclick = () => showSignIn('in');
