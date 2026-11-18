@@ -1,12 +1,21 @@
 {
+  "id": "/",
   "name": "T1D Care Hub",
   "short_name": "T1D Hub",
   "description": "Family care hub for type 1 diabetes",
+  "lang": "en-GB",
+  "dir": "ltr",
+  "categories": [
+    "medical",
+    "health",
+    "lifestyle"
+  ],
+  "orientation": "any",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f2f2f7",
-  "theme_color": "#f2f2f7",
+  "background_color": "#F3F5F9",
+  "theme_color": "#F3F5F9",
   "icons": [
     {
       "src": "/icon-192.png",

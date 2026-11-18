@@ -1,0 +1,118 @@
+# T1D Care Hub: phone reminders
+# Twice a day GitHub checks what's due (site, sensor, supplies, appointments, backups,
+# Sunday summary) and sends a notification to every phone that turned them on.
+# Needs 3 repository secrets: SUPABASE_URL, SUPABASE_SECRET_KEY, VAPID_PRIVATE_KEY.
+name: Reminders
+
+on:
+  schedule:
+    - cron: '13 7 * * *'      # about 7-8am UK time
+    - cron: '13 18 * * *'     # about 6-7pm UK time
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Send reminders
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+        run: |
+          npm install --no-save --silent web-push@3.6.7
+          cat > reminders.mjs <<'EOF'
+          // T1D Care Hub reminder job: works out what's due and sends a notification to each subscribed phone.
+          import webpush from 'web-push';
+          const raw = (process.env.SUPABASE_URL || '').trim(), key = (process.env.SUPABASE_SECRET_KEY || '').trim(), priv = (process.env.VAPID_PRIVATE_KEY || '').trim();
+          if (!raw || !key) { console.error('::error::Add the SUPABASE_URL and SUPABASE_SECRET_KEY secrets.'); process.exit(1); }
+          if (!priv) { console.error('::error::Add the VAPID_PRIVATE_KEY secret (the app shows it once when you first turn on notifications).'); process.exit(1); }
+          const base = new URL(raw).origin;
+          const H = { apikey: key, Accept: 'application/json', 'Content-Type': 'application/json' };
+          if (key.startsWith('eyJ')) H.Authorization = 'Bearer ' + key;
+          const NOW = process.env.FAKE_NOW ? +process.env.FAKE_NOW : Date.now();
+          const D = 864e5;
+          const TZ = 'Europe/London';
+          const ukDate = ms => new Date(ms).toLocaleDateString('en-CA', { timeZone: TZ });
+          const ukHour = ms => +new Date(ms).toLocaleString('en-GB', { timeZone: TZ, hour: '2-digit', hour12: false });
+          const ukTime = ms => new Date(ms).toLocaleTimeString('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
+          const ukDay = ms => new Date(ms).toLocaleDateString('en-GB', { timeZone: TZ, weekday: 'long' });
+          const ago = ms => { const h = (NOW - ms) / 36e5; return h < 24 ? Math.round(h) + ' hours' : Math.round(h / 24) + ' days'; };
+          const left = ms => { const h = (ms - NOW) / 36e5; return h <= 0 ? 'overdue' : h < 24 ? 'in ' + Math.max(1, Math.round(h)) + ' h' : 'in ' + (h / 24).toFixed(1) + ' days'; };
+
+          const rows = [];
+          for (let off = 0; ; off += 1000) {
+            const r = await fetch(`${base}/rest/v1/records?select=family_id,collection,id,data&order=family_id,collection,id&limit=1000&offset=${off}`, { headers: H });
+            if (!r.ok) { console.error(`::error::Supabase said ${r.status}: ${(await r.text()).slice(0, 300)}`); process.exit(1); }
+            const page = await r.json(); rows.push(...page); if (page.length < 1000) break;
+          }
+          const fams = [...new Set(rows.map(r => r.family_id))];
+          const today = ukDate(NOW), hour = ukHour(NOW), evening = hour >= 12, isSunday = new Date(NOW).toLocaleDateString('en-GB', { timeZone: TZ, weekday: 'short' }) === 'Sun';
+          let sentTotal = 0;
+
+          for (const fid of fams) {
+            const mine = rows.filter(r => r.family_id === fid);
+            const col = c => mine.filter(r => r.collection === c).map(r => ({ id: r.id, ...r.data }));
+            const doc = (c, id) => mine.find(r => r.collection === c && r.id === id)?.data || null;
+            const plan = doc('plan', 'plan') || {}, pushMeta = doc('meta', 'push'), plog = doc('meta', 'pushlog') || { sent: {} };
+            const subs = col('push').filter(s => s.endpoint && s.keys);
+            const name = (plan.name || '').trim() || 'him';
+            const n = v => (v === '' || v == null || isNaN(+v)) ? null : +v;
+            const items = [];
+            // site change: latest of logged site change or pump "site/rewind" events
+            const log = col('log');
+            const lastOf = t => log.filter(e => e.type === t).reduce((m, e) => Math.max(m, e.at || 0), 0) || null;
+            let site = lastOf('site');
+            for (const p of col('pump')) { const b = Date.parse(p.day + 'T00:00:00'); for (let i = 0; i < (p.ev || []).length; i += 3) if (p.ev[i + 1] === 4) site = Math.max(site || 0, b + p.ev[i] * 6e4); }
+            if (site) { const due = site + (n(plan.siteDays) ?? 3) * D; if (due - NOW < 14 * 36e5) items.push({ k: 'site:' + ukDate(due), title: `Site change ${left(due)}`, body: `${name[0].toUpperCase() + name.slice(1)}'s infusion set was changed ${ago(site)} ago.`, url: '/#today' }); }
+            const sensor = lastOf('sensor');
+            if (sensor) { const due = sensor + (n(plan.sensorDays) ?? 10) * D; if (due - NOW < 14 * 36e5) items.push({ k: 'sensor:' + ukDate(due), title: `Sensor change ${left(due)}`, body: `Sensor was put in ${ago(sensor)} ago.`, url: '/#today' }); }
+            // supplies to order (mornings, every other day)
+            if (!evening) {
+              const low = col('supplies').filter(s => (s.qty || 0) * (s.days || 0) <= (s.lead ?? 14));
+              if (low.length) items.push({ k: 'sup:' + Math.floor(NOW / (2 * D)), title: `${low.length} ${low.length === 1 ? 'supply' : 'supplies'} to order`, body: low.map(s => s.name).slice(0, 4).join(', '), url: '/#supplies' });
+            }
+            // appointments: today (morning) and tomorrow (evening)
+            for (const a of col('appts')) {
+              if (a.status !== 'booked' || !a.at) continue;
+              const d = ukDate(a.at), when = a.hasTime ? ukTime(a.at) : '';
+              const what = { gp: 'GP', diabetes: 'Diabetes clinic', vaccine: 'Vaccination', dental: 'Dentist', eye: 'Eye test', hospital: 'Hospital' }[a.kind] || 'Appointment';
+              if (!evening && d === today) items.push({ k: 'apptT:' + a.id, title: `${what} today${when ? ' at ' + when : ''}`, body: [a.where, a.notes].filter(Boolean).join(' · ').slice(0, 140), url: '/#appts' });
+              if (evening && d === ukDate(NOW + D)) items.push({ k: 'apptN:' + a.id, title: `${what} tomorrow${when ? ' at ' + when : ''}`, body: [a.where, a.notes].filter(Boolean).join(' · ').slice(0, 140), url: '/#appts' });
+            }
+            // backups
+            const bk = doc('meta', 'backup');
+            if (bk?.at && NOW - bk.at > 36 * 36e5) items.push({ k: 'bk:' + today, title: 'Backup missed', body: `The last automatic backup was ${ago(bk.at)} ago. Open Setup check in the app.`, url: '/#setup' });
+            // Sunday evening: his week
+            if (isSunday && evening) {
+              const from = NOW - 7 * D; let tot = 0, inR = 0, lo = 0;
+              for (const c of col('cgm')) { const b = Date.parse(c.day + 'T00:00:00'); const p = c.pts || []; for (let i = 0; i < p.length; i += 2) { const t = b + p[i] * 6e4; if (t < from || t > NOW) continue; const v = p[i + 1] / 10; tot++; if (v >= 3.9 && v <= 10) inR++; if (v < 3.9) lo++; } }
+              const hypos = log.filter(e => e.type === 'hypo' && e.at >= from).length;
+              const body = [tot ? `In range ${Math.round(inR / tot * 100)}%` : null, tot ? `low ${(lo / tot * 100).toFixed(1)}%` : null, `${hypos} hypo${hypos === 1 ? '' : 's'} logged`].filter(Boolean).join(' · ');
+              items.push({ k: 'week:' + today, title: `${name === 'him' ? 'His' : name + "'s"} week`, body: body + '. Open the app for the full summary.', url: '/#today' });
+            }
+            const fresh = items.filter(i => !plog.sent?.[i.k]);
+            console.log(`family ${fid.slice(0, 8)}: ${items.length} due, ${fresh.length} new, ${subs.length} phone(s)`);
+            if (fresh.length && subs.length && pushMeta?.publicKey) {
+              webpush.setVapidDetails('https://github.com/' + (process.env.GITHUB_REPOSITORY || 't1d-care-hub'), pushMeta.publicKey, priv);
+              for (const s of subs) for (const it of fresh) {
+                try { await webpush.sendNotification({ endpoint: s.endpoint, keys: s.keys }, JSON.stringify({ title: it.title, body: it.body, tag: it.k.split(':')[0], url: it.url }), { TTL: 6 * 3600 }); sentTotal++; }
+                catch (e) {
+                  if (e.statusCode === 404 || e.statusCode === 410) { await fetch(`${base}/rest/v1/records?family_id=eq.${fid}&collection=eq.push&id=eq.${encodeURIComponent(s.id)}`, { method: 'DELETE', headers: H }); console.log('removed an old phone subscription'); break; }
+                  console.log(`::warning::push failed (${e.statusCode || ''}) ${String(e.body || e.message).slice(0, 120)}`);
+                }
+              }
+            } else if (fresh.length && !pushMeta?.publicKey) console.log('::warning::Notifications are not turned on in the app yet (Setup check → Turn on notifications).');
+            // remember what was sent (keep 40 days) and when this job last ran
+            const sent = Object.fromEntries(Object.entries(plog.sent || {}).filter(([, t]) => NOW - t < 40 * D));
+            if (subs.length && pushMeta?.publicKey) fresh.forEach(i => sent[i.k] = NOW);
+            await fetch(`${base}/rest/v1/records?on_conflict=family_id,collection,id`, { method: 'POST', headers: { ...H, Prefer: 'resolution=merge-duplicates' },
+              body: JSON.stringify({ family_id: fid, collection: 'meta', id: 'pushlog', data: { at: NOW, sent }, updated_at: new Date(NOW).toISOString() }) });
+          }
+          console.log(`sent ${sentTotal} notification(s)`);
+          EOF
+          node reminders.mjs

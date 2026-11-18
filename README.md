@@ -34,3 +34,20 @@ Upload the changed files the same way. Phones get the new version next time the 
    - `BACKUP_PASSWORD`: a long password you make up. **Write it down.** Without it the GitHub backups can't be opened.
 3. **Actions → Daily backup → Run workflow** to test it. A green tick means it worked. It then runs every night and keeps 90 days.
 4. To restore: open a run and download the backup at the bottom. In the app, go to **Backup → Restore from backup**, pick the .zip and enter the password.
+
+## Android app (free, for testing)
+1. Go to **pwabuilder.com**, paste your app's web address, and press **Start**.
+2. Press **Package for stores → Android → Generate package**. Keep the default settings and download the zip.
+3. Upload the zip's `assetlinks.json` to the top level of this GitHub repo. Vercel redeploys on its own, and the app then opens without a browser address bar.
+4. Send the `.apk` from the zip to each Android phone, open it and allow **Install unknown apps** when asked.
+5. Keep the zip's `signing.keystore` and `signing-key-info.txt` safe. You need them to make updated versions of the app.
+
+## Version 2: phone reminders (10 minutes)
+1. Open the app → **More → Setup check → Turn on notifications on this phone**. The first time, it shows a secret key once. Copy it.
+2. GitHub repo → **Settings → Secrets and variables → Actions → New repository secret**. Name `VAPID_PRIVATE_KEY`, value: the key you copied.
+3. GitHub repo → **Add file → Create new file**. Name it exactly `.github/workflows/reminders.yml`, paste in the contents of `reminders.yml` and commit.
+4. **Actions → Reminders → Run workflow** to test it. Reminders then come about 7–8am and 6–7pm.
+5. On his mum's phone: open the app → Setup check → Turn on notifications. She doesn't need a new key.
+6. Also replace `.github/workflows/daily-backup.yml` with the new `daily-backup.yml`. It now tells the app when the off-site backup worked, so Setup check can show it.
+
+iPhone: notifications only work when the app has been added to the Home Screen (Safari → Share → Add to Home Screen) and is opened from there.

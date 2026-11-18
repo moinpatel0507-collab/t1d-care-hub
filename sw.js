@@ -16,3 +16,12 @@ self.addEventListener('fetch', e => {
       return m || f; })));
   }
 });
+// phone notifications sent by the GitHub reminder job
+self.addEventListener('push', e => {
+  let d = {}; try { d = e.data.json(); } catch { d = { title: 'T1D Care Hub', body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'T1D Care Hub', { body: d.body || '', tag: d.tag || undefined, icon: '/icon-192.png', badge: '/icon-192.png', data: { url: d.url || '/' } }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close(); const url = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => { for (const c of cs) { if ('focus' in c) { c.navigate && c.navigate(url).catch(() => {}); return c.focus(); } } return clients.openWindow(url); }));
+});

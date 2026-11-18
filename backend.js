@@ -27,15 +27,73 @@ function splitPath(path) {
   throw new TypeError('Unsupported path ' + path);
 }
 const key = (col, id) => col + '/' + id;
+
+/* ---------------- offline: copy of the data on this phone + a queue of unsent changes ---------------- */
+const idb = (() => {
+  let dbp = null;
+  const open = () => dbp ??= new Promise((res, rej) => { const r = indexedDB.open('t1d-offline', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  const tx = async (mode, fn) => { const d = await open(); return new Promise((res, rej) => { const t = d.transaction('kv', mode); const q = fn(t.objectStore('kv')); t.oncomplete = () => res(q?.result); t.onerror = () => rej(t.error); }); };
+  return { get: k => tx('readonly', s => s.get(k)).catch(() => undefined), set: (k, v) => tx('readwrite', s => s.put(v, k)).catch(() => {}), clear: () => tx('readwrite', s => s.clear()).catch(() => {}) };
+})();
+let queue = [];                       // [{op:'set'|'del', col, id, data, at}]
+let offline = false, flushing = false;
+const isNetErr = (e) => !navigator.onLine || /fetch|network|load failed|timed? ?out|ECONN|503|502|504/i.test(String(e?.message || e?.details || e || ''));
+const saveQueue = () => idb.set('queue:' + familyId, queue);
+let snapTimer = null;
+const saveSnapSoon = () => { clearTimeout(snapTimer); snapTimer = setTimeout(() => { if (familyId) idb.set('snap:' + familyId, [...cache.entries()]); }, 1500); };
+function applyQueue(map) { for (const q of queue) { const k = key(q.col, q.id); if (q.op === 'del') map.delete(k); else map.set(k, q.data); } }
+function enqueue(op, col, id, data) {
+  queue = queue.filter(q => !(q.col === col && q.id === id));      // newest change wins
+  queue.push({ op, col, id, data: data ?? null, at: Date.now() }); saveQueue(); syncPill();
+}
+async function flushQueue() {
+  if (flushing || !queue.length || !familyId) return; flushing = true; syncPill();
+  try {
+    while (queue.length) {
+      const q = queue[0];
+      const { error } = q.op === 'del'
+        ? await supabase.from('records').delete().match({ family_id: familyId, collection: q.col, id: q.id })
+        : await supabase.from('records').upsert({ family_id: familyId, collection: q.col, id: q.id, data: q.data, updated_by: me, updated_at: new Date(q.at).toISOString() }, { onConflict: 'family_id,collection,id' });
+      if (error) { if (isNetErr(error)) break; console.warn('dropped unsyncable change', q, error); }
+      queue.shift(); saveQueue();
+    }
+  } catch (e) { /* still offline */ }
+  flushing = false;
+  if (!queue.length && offline) await goOnline();
+  syncPill();
+}
+function syncPill() {
+  const top = document.querySelector('.hero-top'); if (!top) return;
+  let el = document.getElementById('syncPill');
+  const n = queue.length;
+  if (!offline && !n) { el?.remove(); return; }
+  if (!el) { el = document.createElement('span'); el.id = 'syncPill'; el.className = 'sync-pill'; el.setAttribute('role', 'status'); top.insertBefore(el, top.querySelector('.acct') || null); }
+  el.classList.toggle('off', offline);
+  el.textContent = offline ? (n ? `Offline · ${n} to sync` : 'Offline · saving on this phone') : (flushing ? `Syncing ${n}…` : `${n} to sync`);
+}
+setInterval(() => { if (queue.length) flushQueue(); }, 30000);
+addEventListener('online', () => { flushQueue(); if (offline) goOnline(); });
+addEventListener('offline', () => { offline = true; syncPill(); });
 const meta = { fromCache: false, hasPendingWrites: false };
 const snapDoc = (col, id) => { const d = cache.get(key(col, id)); return { id, exists: !!d, data: () => d, metadata: meta }; };
-const notify = () => listeners.forEach(f => { try { f(); } catch (e) { console.error(e); } });
+const notify = () => { listeners.forEach(f => { try { f(); } catch (e) { console.error(e); } }); saveSnapSoon(); };
 let notifyTimer = null;   // live changes can arrive in bursts (e.g. a restore): redraw once
 const notifySoon = () => { clearTimeout(notifyTimer); notifyTimer = setTimeout(notify, 60); };
 const err = (e) => Object.assign(new Error(e?.message || 'Save failed'), { code: e?.code === '42501' ? 'not_granted' : (e?.code || 'unavailable') });
 
 async function writeRow(col, id, data) {
-  const { error } = await supabase.from('records').upsert({ family_id: familyId, collection: col, id, data, updated_by: me, updated_at: new Date().toISOString() }, { onConflict: 'family_id,collection,id' });
+  if (offline || !navigator.onLine || queue.length) { enqueue('set', col, id, data); flushQueue(); return; }
+  let error;
+  try { ({ error } = await supabase.from('records').upsert({ family_id: familyId, collection: col, id, data, updated_by: me, updated_at: new Date().toISOString() }, { onConflict: 'family_id,collection,id' })); }
+  catch (e) { error = e; }
+  if (error && isNetErr(error)) { offline = !navigator.onLine || offline; enqueue('set', col, id, data); return; }
+  if (error) throw err(error);
+}
+async function deleteRow(col, id) {
+  if (offline || !navigator.onLine || queue.length) { enqueue('del', col, id); flushQueue(); return; }
+  let error;
+  try { ({ error } = await supabase.from('records').delete().match({ family_id: familyId, collection: col, id })); } catch (e) { error = e; }
+  if (error && isNetErr(error)) { enqueue('del', col, id); return; }
   if (error) throw err(error);
 }
 const newId = () => (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '').slice(0, 20) : Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
@@ -47,7 +105,7 @@ function docRef(path) {
     async get() { return snapDoc(col, id); },
     async set(data) { const prev = cache.get(key(col, id)); cache.set(key(col, id), JSON.parse(JSON.stringify(data))); notifySoon(); try { await writeRow(col, id, data); } catch (e) { prev ? cache.set(key(col, id), prev) : cache.delete(key(col, id)); notifySoon(); throw e; } },
     async update(data) { const merged = { ...(cache.get(key(col, id)) || {}), ...data }; return this.set(merged); },
-    async delete() { const prev = cache.get(key(col, id)); cache.delete(key(col, id)); notifySoon(); const { error } = await supabase.from('records').delete().match({ family_id: familyId, collection: col, id }); if (error) { if (prev) cache.set(key(col, id), prev); notifySoon(); throw err(error); } },
+    async delete() { const prev = cache.get(key(col, id)); cache.delete(key(col, id)); notifySoon(); try { await deleteRow(col, id); } catch (e) { if (prev) cache.set(key(col, id), prev); notifySoon(); throw e; } },
     onSnapshot(next) { const f = () => next(snapDoc(col, id)); listeners.add(f); queueMicrotask(f); return () => listeners.delete(f); },
     collection(sub) { return colRef(path + '/' + sub); },
   };
@@ -84,9 +142,12 @@ async function loadAll() {
     data.forEach(r => fresh.set(key(r.collection, r.id), r.data));
     if (data.length < page) break;
   }
+  applyQueue(fresh);
   cache.clear(); fresh.forEach((v, k) => cache.set(k, v)); notify();
 }
+let subscribed = false;
 function subscribe() {
+  if (subscribed) return; subscribed = true;
   supabase.channel('family-' + familyId)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'records', filter: 'family_id=eq.' + familyId }, (p) => {
       if (p.eventType === 'DELETE') { const o = p.old || {}; if (o.collection) cache.delete(key(o.collection, o.id)); }
@@ -95,8 +156,8 @@ function subscribe() {
     })
     .subscribe();
   // phones pause background connections: refresh when the app comes back
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) loadAll().catch(() => {}); });
-  addEventListener('online', () => loadAll().catch(() => {}));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) flushQueue().then(() => loadAll()).catch(() => {}); });
+  addEventListener('online', () => flushQueue().then(() => loadAll()).catch(() => {}));
 }
 
 /* ---------------- capabilities the app asks for ---------------- */
@@ -248,15 +309,49 @@ async function start() {
   if (!session) return showSignIn();
   if (recovering) return showNewPassword();
   me = session.user.id;
-  const { data: mem, error } = await supabase.from('family_members').select('family_id, user_id, display_name, families(invite_code)').eq('user_id', me).limit(1);
+  let mem = null, error = null;
+  try { ({ data: mem, error } = await supabase.from('family_members').select('family_id, user_id, display_name, families(invite_code)').eq('user_id', me).limit(1)); } catch (e) { error = e; }
+  if (error && isNetErr(error)) return startOffline();
   if (error) { screen(`<h1>Can't reach the database</h1><p class="muted">${esc(error.message)}</p><button class="primary" onclick="location.reload()">Try again</button>`); return; }
   if (!mem.length) return showFamilySetup();
   familyId = mem[0].family_id; family = mem[0].families;
   const { data: all } = await supabase.from('family_members').select('user_id, display_name').eq('family_id', familyId);
   members = all || [];
-  try { await loadAll(); } catch (e) { screen(`<h1>Couldn't load your data</h1><p class="muted">${esc(e.message)}</p><button class="primary" onclick="location.reload()">Try again</button>`); return; }
+  idb.set('fam', { me, familyId, family, members });
+  queue = (await idb.get('queue:' + familyId)) || [];
+  if (queue.length) await flushQueue();
+  try { await loadAll(); } catch (e) { if (isNetErr(e)) return startOffline(); screen(`<h1>Couldn't load your data</h1><p class="muted">${esc(e.message)}</p><button class="primary" onclick="location.reload()">Try again</button>`); return; }
   gate.hidden = true; gate.innerHTML = '';
+  offline = false; syncPill(); exposeFamily();
   if (!started) { started = true; subscribe(); addFamilyPanel(); addAccountChip(); addAutoBackupPanel(); readyResolve(); }
+  else if (!subscribed) subscribe();
+}
+function exposeFamily() {
+  window.__family = { members: members.length, code: family?.invite_code || '', signupsClosed: window.__family?.signupsClosed ?? null };
+  fetch(URL.replace(/\/+$/, '') + '/auth/v1/settings', { headers: { apikey: KEY } }).then(r => r.ok ? r.json() : null)
+    .then(j => { if (j && 'disable_signup' in j) { window.__family.signupsClosed = !!j.disable_signup; notify(); } }).catch(() => {});
+}
+window.__familyRefresh = async () => { try { const { data } = await supabase.from('family_members').select('user_id, display_name').eq('family_id', familyId); if (data) members = data; } catch {} exposeFamily(); notify(); };
+async function startOffline() {
+  const fam = await idb.get('fam');
+  if (!fam || fam.me !== me) { screen(`<h1>No connection</h1><p class="muted">The app needs the internet the first time you sign in on this phone. After that it works without signal.</p><button class="primary" onclick="location.reload()">Try again</button>`); return; }
+  ({ familyId, family, members } = fam); offline = true; window.__family = { members: members.length, code: family?.invite_code || '', signupsClosed: null };
+  queue = (await idb.get('queue:' + familyId)) || [];
+  const snap = (await idb.get('snap:' + familyId)) || [];
+  const m = new Map(snap); applyQueue(m); cache.clear(); m.forEach((v, k) => cache.set(k, v));
+  gate.hidden = true; gate.innerHTML = '';
+  if (!started) { started = true; addFamilyPanel(); addAccountChip(); readyResolve(); }
+  notify(); syncPill();
+}
+async function goOnline() {
+  if (!navigator.onLine) return;
+  try {
+    const { error } = await supabase.from('family_members').select('family_id').eq('user_id', me).limit(1);
+    if (error) return;
+    offline = false; await flushQueue(); await loadAll(); if (!subscribed) subscribe();
+    if (!document.getElementById('autoBk')) addAutoBackupPanel();
+    syncPill();
+  } catch {}
 }
 function addAccountChip() {
   const top = document.querySelector('.hero-top'); if (!top || document.getElementById('acct')) return;
@@ -271,7 +366,7 @@ function addAccountChip() {
   btn.onclick = (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); };
   document.addEventListener('click', (e) => { if (!w.contains(e.target)) close(); });
   w.querySelector('a.acct-item').onclick = () => { close(); setTimeout(() => document.querySelector('#v-plan .panel:last-child')?.scrollIntoView({ behavior: 'smooth' }), 150); };
-  w.querySelector('.acct-out').onclick = async () => { w.querySelector('.acct-out').textContent = 'Signing out…'; await supabase.auth.signOut(); location.reload(); };
+  w.querySelector('.acct-out').onclick = async () => { w.querySelector('.acct-out').textContent = 'Signing out…'; await idb.clear(); await supabase.auth.signOut(); location.reload(); };
 }
 function addFamilyPanel() {
   const host = document.querySelector('#v-plan'); if (!host) return;
@@ -285,7 +380,7 @@ function addFamilyPanel() {
   host.appendChild(p);
   p.querySelector('#copyFam').onclick = async () => { try { await navigator.clipboard.writeText(family?.invite_code || ''); } catch {} };
   const sf = p.querySelector('#shareFam'); if (sf) sf.onclick = () => navigator.share({ text: `Join our T1D Care Hub. Open ${location.origin}, create an account, tap Join family and enter this code: ${family?.invite_code}` }).catch(() => {});
-  p.querySelector('#signOut').onclick = async () => { await supabase.auth.signOut(); location.reload(); };
+  p.querySelector('#signOut').onclick = async () => { await idb.clear(); await supabase.auth.signOut(); location.reload(); };
 }
 
 /* ---------------- automatic daily backups (see supabase/backup-setup.sql) ---------------- */

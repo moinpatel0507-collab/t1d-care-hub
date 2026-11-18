@@ -3,7 +3,7 @@
 
 (() => {
 const TYPES = {
-  hypo:{label:"Hypo treated",chip:"low"}, high:{label:"High / correction",chip:"high"}, ketones:{label:"Ketones",chip:"urgent"},
+  bg:{label:"BG check",chip:"blue"}, hypo:{label:"Hypo treated",chip:"low"}, high:{label:"High / correction",chip:"high"}, ketones:{label:"Ketones",chip:"urgent"},
   site:{label:"Site / pod change",chip:"blue"}, sensor:{label:"Sensor change",chip:"blue"}, ill:{label:"Unwell",chip:"high"},
   activity:{label:"Activity",chip:""}, note:{label:"Note",chip:""},
   food:{label:"Food",chip:"food"}, drink:{label:"Drink",chip:"drink"}
@@ -15,16 +15,17 @@ let db = null, base = null, plan = {}, log = [], supplies = [];
 let canWrite = false, me = null, names = {}, userCap = null;
 
 /* ---------- views ---------- */
-const VIEWS = ["today","glucose","food","log","supplies","checks","appts","reports","sick","plan","backup"];
+const VIEWS = ["today","glucose","food","log","supplies","checks","appts","reports","sick","plan","backup","setup"];
 function route(){
   const v = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "today";
-  VIEWS.forEach(n => $("#v-"+n).hidden = n !== v);
+  VIEWS.forEach(n => $("#v-"+n).hidden = n !== v); document.documentElement.dataset.view = v;
   document.querySelectorAll("#nav a, #moreSheet a").forEach(a => a.getAttribute("href") === "#"+v ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"));
   const secOn = !!document.querySelector('#nav a.sec[aria-current="page"]');
   $("#moreBtn").classList.toggle("on", secOn); $("#moreSheet").hidden = true; $("#moreBtn").setAttribute("aria-expanded","false");
   scrollTo({top:0}); if(v==="glucose" && typeof renderGlucose==="function") setTimeout(renderGlucose,0); if(v==="reports" && typeof renderReport==="function") setTimeout(renderReport,0);
 }
 addEventListener("hashchange", route); route();
+$("#sheetSearch").addEventListener("submit", ev => { ev.preventDefault(); const q=$("#sheetQ").value.trim(); location.hash="log"; setTimeout(()=>{ const i=$("#logSearch"); if(i){ i.value=q; renderLog(); i.focus(); } }, 0); });
 $("#moreBtn").addEventListener("click", () => { const sh=$("#moreSheet"); sh.hidden=!sh.hidden; $("#moreBtn").setAttribute("aria-expanded", String(!sh.hidden)); });
 $("#moreSheet").addEventListener("click", e => { if(e.target.id==="moreSheet") { e.currentTarget.hidden=true; $("#moreBtn").setAttribute("aria-expanded","false"); } });
 
@@ -69,16 +70,34 @@ function renderHeroRing(){
   const col = !s ? "var(--hero-muted)" : frac<=0 ? "#ff9b91" : frac<0.2 ? "#ffd28a" : "var(--ring)";
   el.innerHTML = `<svg viewBox="0 0 132 132" width="132" height="132"><circle cx="66" cy="66" r="${R}" fill="none" stroke="var(--hero-chip)" stroke-width="12"/><circle cx="66" cy="66" r="${R}" fill="none" stroke="${col}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${(C*frac).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 66 66)"/></svg><div class="hr-in"><b>${big}</b><span>${small}</span></div>`;
 }
+function ringCard(label, lastMs, days, colorVar, softVar, what){
+  const R=44, C=2*Math.PI*R; let frac=0, big="—", unit="", sub=`No ${what} logged yet`, cls="";
+  if(lastMs){ const left=(lastMs+days*864e5-Date.now())/864e5; frac=Math.max(0,Math.min(1,left/days));
+    if(left<0){ big="Due"; unit="overdue"; cls="bad"; } else if(left<1){ big=String(Math.max(1,Math.round(left*24))); unit="hours left"; cls="warn"; } else { big=left.toFixed(1); unit="days left"; }
+    sub = "Changed " + new Date(lastMs).toLocaleString("en-GB",{weekday:"long",hour:"2-digit",minute:"2-digit"}).replace(" at "," "); }
+  const col = cls==="bad" ? "var(--low)" : cls==="warn" ? "var(--high)" : `var(${colorVar})`;
+  return `<div class="ring-card ${cls}"><div class="rc-ring"><svg viewBox="0 0 104 104" width="104" height="104" aria-hidden="true"><circle cx="52" cy="52" r="${R}" fill="none" stroke="var(${softVar})" stroke-width="10"/><circle cx="52" cy="52" r="${R}" fill="none" stroke="${col}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C*(1-frac)).toFixed(1)}" transform="rotate(-90 52 52)"/></svg><div class="rc-in"><b>${big}</b><span>${unit}</span></div></div><span class="rc-t">${label}</span><span class="rc-s">${esc(sub)}</span></div>`;
+}
+function renderRings(){
+  const el=$("#rings"); if(!el) return; const s=lastSite(), sn=last("sensor");
+  el.innerHTML = ringCard("Infusion set", s?.at, num(plan.siteDays)??3, "--accent", "--accent-soft", "change") + ringCard("Sensor", sn?.at, num(plan.sensorDays)??10, "--teal", "--teal-soft", "sensor change");
+}
+function renderTodayStats(){
+  const el=$("#todayStats"); if(!el) return; const t=dayTotals(dayKey(Date.now())), lf=log.find(e=>e.type==="food");
+  el.innerHTML = [["Carbs", t.carbs+" g"],["Drinks", t.ml+" ml"],["Last ate", lf ? new Date(lf.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}) : "—"]]
+    .map(([k,v])=>`<div><span class="k">${k}</span><b>${v}</b></div>`).join("");
+}
 function renderHero(){ renderHeroRing(); try { $("#who").textContent = friendlyLine(); } catch {}
   const h=new Date().getHours(); const nm=(plan.name||"").trim();
-  $("#heroTitle").textContent = (h<12?"Good morning":h<18?"Good afternoon":"Good evening") + (nm?`, here's ${nm}'s day`:"");
+  $("#heroTitle").textContent = nm ? `${nm}'s day` : (h<12?"Good morning":h<18?"Good afternoon":"Good evening");
+  renderRings(); renderTodayStats();
   $("#heroDate").textContent = new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
   const site=siteStatus(), t=dayTotals(dayKey(Date.now())), lf=log.find(e=>e.type==="food");
   const wk=log.filter(e=>e.type==="hypo" && e.at>Date.now()-7*864e5).length;
   const chips=[["Site",site.v.replace(" left",""),site.cls],["Carbs",t.carbs+" g",""],["Drinks",t.ml+" ml",""],["Last ate",lf?new Date(lf.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):"—",""],["Hypos 7d",String(wk),wk>=3?"warn":""]];
   $("#heroChips").innerHTML = chips.map(([k,v,c])=>`<div class="hchip ${c}"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>`).join("");
 }
-function renderAll(){ renderHero(); renderStrip(); renderRecent(); renderFood(); renderLog(); renderSupplies(); renderSick(); renderItems(); renderGlucose(); renderChecks(); renderBackup(); renderMealPatterns(); renderComing(); renderAppts(); renderDeliveries(); renderReport(); }
+function renderAll(){ renderHero(); renderStrip(); renderRecent(); renderFood(); renderLog(); renderSupplies(); renderSick(); renderItems(); renderGlucose(); renderChecks(); renderBackup(); renderMealPatterns(); renderComing(); renderAppts(); renderDeliveries(); renderReport(); renderFavs(); renderWeek(); renderSetup(); renderBgNow(); renderBgChecks(); }
 const dayKey = ms => new Date(ms).toDateString();
 function dayTotals(key){ const es = log.filter(e => dayKey(e.at)===key && (e.type==="food"||e.type==="drink"));
   return { carbs: es.reduce((a,e)=>a+(e.carbs||0),0), ml: es.filter(e=>e.type==="drink").reduce((a,e)=>a+(e.ml||0),0), meals: es.filter(e=>e.type==="food").length, drinks: es.filter(e=>e.type==="drink").length, es }; }
@@ -93,7 +112,7 @@ function renderFood(){
     `<div class="stat"><span class="k">Last ate</span><span class="v">${lastFood?new Date(lastFood.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):"—"}</span><span class="n">${lastFood?esc((lastFood.meal||"")+" · "+ago(lastFood.at)):"Nothing logged"}</span></div>`,
     `<div class="stat"><span class="k">Last drink</span><span class="v">${lastDrink?new Date(lastDrink.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):"—"}</span><span class="n">${lastDrink?ago(lastDrink.at):"Nothing logged"}</span></div>`
   ].join("");
-  $("#foodToday").innerHTML = t.es.length ? t.es.slice().reverse().map(e => `<div class="meal">
+  $("#foodToday").innerHTML = t.es.length ? t.es.slice().reverse().map(e => `<div class="meal tap" data-ledit="${esc(e.id)}" role="button" tabindex="0" aria-label="Edit ${esc(e.item||TYPES[e.type].label)}">
       <span class="t">${new Date(e.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})}</span>
       <div style="min-width:0;overflow-wrap:anywhere"><span class="chip ${TYPES[e.type].chip}">${e.type==="food"?esc(e.meal||"Food"):"Drink"}</span>${esc(e.item||"")}${e.type==="food"&&e.ate&&e.ate!=="All"?` <span class="muted">· ate ${esc(e.ate.toLowerCase())}</span>`:""}${e.note?`<div class="muted">${esc(e.note)}</div>`:""}</div>
       <span class="c">${e.carbs!=null?e.carbs+" g":""}${e.type==="drink"&&e.ml!=null?`<div class="muted" style="font-size:.85rem">${e.ml} ml</div>`:""}</span></div>`).join("")
@@ -103,6 +122,7 @@ function renderFood(){
 }
 function renderItems(){
   const seen = new Set(), opts = [];
+  for (const f of favSort()) { seen.add(f.name.toLowerCase()); opts.push(f.name); }
   for (const e of log) if ((e.type==="food"||e.type==="drink") && e.item && !seen.has(e.item.toLowerCase())) { seen.add(e.item.toLowerCase()); opts.push(e.item); if(opts.length>=80) break; }
   $("#itemList").innerHTML = opts.map(o=>`<option value="${esc(o)}"></option>`).join("");
 }
@@ -127,9 +147,8 @@ function renderStrip(){
   const wk = log.filter(e => e.type==="hypo" && e.at > Date.now()-7*864e5).length;
   const low = supplyRows().filter(s => s.status !== "OK").sort((a,b)=>a.left-b.left);
   const lk = log.find(e => e.ket != null);
+  { const b=$("#bdgSupplies"); if(b){ b.hidden=!low.length; b.textContent = low.length ? low.length+" to order" : ""; } }
   $("#strip").innerHTML = [
-    `<div class="stat ${site.cls}"><span class="k">Pod / site</span><span class="v">${site.v}</span><span class="n">${site.n}</span></div>`,
-    `<div class="stat ${sen.cls}"><span class="k">Sensor</span><span class="v">${sen.v}</span><span class="n">${sen.n}</span></div>`,
     `<div class="stat ${wk>=3?"warn":""}"><span class="k">Hypos · 7 days</span><span class="v">${wk}</span><span class="n">${wk>=3?"Worth raising with the team":"Logged by you"}</span></div>`,
     `<div class="stat ${low.some(s=>s.status==="Reorder now")?"bad":low.length?"warn":""}"><span class="k">Supplies</span><span class="v">${supplies.length? (low.length? low.length+" to order":"All OK") : "—"}</span><span class="n">${low.length? esc(low.map(s=>s.name).slice(0,2).join(", ")) : supplies.length? "Nothing low" : "Add items on Supplies"}</span></div>`,
     ...["eye","dental"].map(k=>{ const d=dueInfo(k); return d.days!=null && d.days<=30 ? `<div class="stat ${d.cls}"><span class="k">${CK[k].label}</span><span class="v">${d.v}</span><span class="n">${d.n}</span></div>` : ""; }),
@@ -147,16 +166,22 @@ function entryHTML(e){
   if(e.carbs!=null) bits.push(`<span class="num">${e.carbs} g</span> <span class="muted">carbs</span>`);
   return `<li><time datetime="${new Date(e.at).toISOString()}" style="white-space:pre-line">${fmtShort(e.at)}</time>
     <div class="what"><span class="chip ${t.chip}">${t.label}</span>${bits.join(" ")}${e.note? `<div>${esc(e.note)}</div>`:""}${e.by? `<div class="muted" style="font-size:.8rem">Logged by ${e.by===me?"you":esc(names[e.by]||"his mum")}</div>`:""}</div>
-    <button class="small danger" data-del="${esc(e.id)}" ${canWrite?"":"disabled"}>Delete</button></li>`;
+    <div class="row-acts"><button class="small" data-ledit="${esc(e.id)}" ${canWrite?"":"disabled"}>Edit</button><button class="small danger" data-del="${esc(e.id)}" ${canWrite?"":"disabled"}>Delete</button></div></li>`;
 }
 function renderRecent(){
   const r = log.slice(0,6);
   $("#recent").innerHTML = r.length ? r.map(entryHTML).join("") : `<li style="display:block"><div class="empty">Nothing logged yet. Use a quick-log button above. Start with his last pod and sensor change so the countdowns work.</div></li>`;
 }
-function rangeEntries(){ const days=+$("#range").value, f=$("#filter").value; return log.filter(e => e.at > Date.now()-days*864e5 && (!f || e.type===f)); }
+function entryText(e){ return [TYPES[e.type]?.label, e.meal, e.item, e.note, e.ate, e.gl!=null?e.gl.toFixed(1):"", e.ket!=null?e.ket.toFixed(1):"", e.carbs!=null?e.carbs+" g":"", e.ml!=null?e.ml+" ml":"", new Date(e.at).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})].filter(Boolean).join(" ").toLowerCase(); }
+function rangeEntries(){
+  const days=+$("#range").value, f=$("#filter").value, q=($("#logSearch")?.value||"").trim().toLowerCase();
+  if(q){ const words=q.split(/\s+/); return log.filter(e => (!f || e.type===f) && words.every(w => entryText(e).includes(w))); }   // search ignores the date range
+  return log.filter(e => e.at > Date.now()-days*864e5 && (!f || e.type===f)); }
 function renderLog(){
   const r = rangeEntries();
-  $("#fullLog").innerHTML = r.length ? r.map(entryHTML).join("") : `<li style="display:block"><div class="empty">No entries in this range.</div></li>`;
+  const q=($("#logSearch")?.value||"").trim();
+  $("#searchCount").textContent = q ? `${r.length} match${r.length===1?"":"es"}${r.length>200?" · showing 200":""}` : "";
+  $("#fullLog").innerHTML = r.length ? r.slice(0,200).map(entryHTML).join("") : `<li style="display:block"><div class="empty">${q?`Nothing matches “${esc(q)}”.`:"No entries in this range."}</div></li>`;
   const days=+$("#range").value, all = log.filter(e => e.at > Date.now()-days*864e5);
   const cnt = t => all.filter(e=>e.type===t).length;
   const hypos = all.filter(e=>e.type==="hypo");
@@ -234,10 +259,175 @@ const dlg = $("#dlg");
 $("#e_type").innerHTML = Object.entries(TYPES).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join("");
 $("#filter").innerHTML += Object.entries(TYPES).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join("");
 function localNow(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,16); }
+/* ---------- hypo mode: treat, 15-minute recheck, repeat ---------- */
+const HY_KEY = "t1d-hypo-timer", HY_MIN = 15;
+let hy = null, hyTick = null, hyAudio = null;
+function hyLoad(){ try { hy = JSON.parse(localStorage.getItem(HY_KEY)||"null"); } catch { hy = null; } if(hy && Date.now()-hy.start > 3*3600e3) hy=null; }
+function hySave(){ try { hy ? localStorage.setItem(HY_KEY, JSON.stringify(hy)) : localStorage.removeItem(HY_KEY); } catch {} }
+const hyLeft = () => hy ? Math.max(0, hy.start + HY_MIN*6e4 - Date.now()) : 0;
+const mmss = ms => { const s=Math.ceil(ms/1000); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); };
+function hyBeep(){ try { hyAudio ??= new (window.AudioContext||window.webkitAudioContext)(); const a=hyAudio; [0,0.35,0.7].forEach(t=>{ const o=a.createOscillator(), g=a.createGain(); o.frequency.value=880; g.gain.setValueAtTime(0.0001,a.currentTime+t); g.gain.exponentialRampToValueAtTime(0.4,a.currentTime+t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+t+0.28); o.connect(g).connect(a.destination); o.start(a.currentTime+t); o.stop(a.currentTime+t+0.3); }); } catch {} }
+async function hyNotify(){
+  try { navigator.vibrate?.([400,200,400,200,400]); } catch {}
+  hyBeep();
+  if(!("Notification" in window) || Notification.permission!=="granted") return;
+  const o = {body:"15 minutes are up. Check his glucose now.", tag:"t1d-hypo", renotify:true, requireInteraction:true, icon:"/icon-192.png"};
+  try { const r = await navigator.serviceWorker?.getRegistration?.(); if(r){ await r.showNotification("Recheck his glucose", o); return; } } catch {}
+  try { new Notification("Recheck his glucose", o); } catch {}
+}
+function hyBand(g){ const lo=hypoBelow(); if(g==null) return null; if(g<3) return {c:"low", t:"Very low"}; if(g<lo) return {c:"low", t:"Low"}; return {c:"ok", t:"Back above "+lo.toFixed(1)}; }
+function hypoState(){
+  const go=$("#hypoGo"); if(!go) return; const g=latestGlucose();
+  const lowNow = !!(g && g.v<hypoBelow() && Date.now()-g.t < 60*6e4);
+  const urgent = lowNow || !!hy;
+  go.classList.toggle("quiet", !urgent);
+  go.querySelector("small").textContent = urgent ? (hy ? "Recheck timer running" : `Latest reading ${g.v.toFixed(1)}: treatment steps and a 15-minute recheck`) : "Step-by-step help and a 15-minute recheck timer";
+  go.querySelector("b").textContent = urgent ? "He's low" : "He's low?";
+}
+function renderHypoBanner(){ hypoState();
+  const b=$("#hypoBanner"); if(!b) return;
+  if(!hy){ b.hidden=true; return; }
+  const left=hyLeft(); b.hidden=false;
+  b.innerHTML = left>0 ? `<span><b>Hypo recheck in ${mmss(left)}</b> · treated at ${new Date(hy.start).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})}</span><button type="button" class="small" data-hyopen>Open</button>`
+                       : `<span><b>Time to recheck his glucose</b></span><button type="button" class="small primary" data-hyopen>Recheck now</button>`;
+}
+function hyStep(step){
+  const lo=hypoBelow(), tx=P("hypoTx"), signs=P("signs"), gluc=P("glucagon"), body=$("#hyBody");
+  const txBox = tx ? `<div class="hy-tx"><span class="k">His treatment (from his care plan)</span><div>${esc(tx).replace(/\n/g,"<br>")}</div></div>`
+                   : `<div class="hy-tx empty-tx"><span class="k">His treatment</span><div>Add his diabetes team's hypo treatment on <a href="#plan" data-hyclose>Care plan</a> so it shows here.</div></div>`;
+  const emerg = `<div class="hy-emerg"><b>If he's very drowsy, fitting or can't swallow:</b> don't give anything by mouth. ${gluc?`Glucagon: ${esc(gluc)}. `:""}Call 999.</div>`;
+  if(step==="start"){
+    body.innerHTML = `<label class="hy-big">Glucose now <small>mmol/L, from CGM or a finger prick</small><input id="hy_gl" type="number" step="0.1" min="0" inputmode="decimal" placeholder="e.g. 3.4"></label>
+      <div id="hy_band"></div>${txBox}
+      <label>Carbs given <small>g</small><input id="hy_c" type="number" min="0" step="1" inputmode="numeric"></label>
+      <label>What you gave <small>optional</small><input id="hy_what" placeholder="e.g. juice carton"></label>
+      ${emerg}
+      <button type="button" class="primary hy-cta" id="hy_go">Treated · start 15-minute timer</button>`;
+    const gi=$("#hy_gl"); gi.addEventListener("input", () => { const b=hyBand(num(gi.value)); $("#hy_band").innerHTML = b?`<span class="chip ${b.c}">${b.t}</span>`:""; });
+    $("#hy_go").addEventListener("click", hyStart); setTimeout(()=>gi.focus(),50);
+  } else if(step==="wait"){
+    body.innerHTML = `<div class="hy-ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" class="hr-bg"/><circle cx="60" cy="60" r="52" class="hr-fg" id="hy_arc"/></svg><div class="hy-time"><b id="hy_left">${mmss(hyLeft())}</b><span>until recheck</span></div></div>
+      <p class="muted" style="text-align:center;margin:0">Keep him calm and stay with him. ${hy.round>1?`This is treatment ${hy.round}.`:""}</p>
+      ${txBox}
+      <button type="button" class="primary hy-cta" id="hy_now">Recheck now</button>
+      <p class="hy-note">The phone beeps and buzzes when time is up while the app is open. If you switch apps or lock the phone, set a 15-minute timer on the phone as well.</p>`;
+    $("#hy_now").addEventListener("click", () => hyStep("recheck"));
+  } else if(step==="recheck"){
+    body.innerHTML = `<label class="hy-big">Glucose now <small>mmol/L</small><input id="hy_gl2" type="number" step="0.1" min="0" inputmode="decimal"></label>
+      <div id="hy_res"></div>`;
+    const gi=$("#hy_gl2"); setTimeout(()=>gi.focus(),50);
+    gi.addEventListener("input", () => { const g=num(gi.value), b=hyBand(g); const r=$("#hy_res");
+      if(g==null){ r.innerHTML=""; return; }
+      r.innerHTML = g<lo ? `<div class="band low"><strong>Still low (${g.toFixed(1)})</strong><span>Treat again as his plan says, then start another 15 minutes.</span></div>${txBox}
+          <label>Carbs given this time <small>g</small><input id="hy_c2" type="number" min="0" step="1" inputmode="numeric"></label>
+          <button type="button" class="primary hy-cta" id="hy_again">Treated again · start 15 minutes</button>${hy.round>=2?`<div class="hy-emerg"><b>Still low after ${hy.round} treatments?</b> Follow his plan and call his diabetes team${P("teamOoh")?` (out of hours: ${esc(P("teamOoh"))})`:""}.</div>`:""}`
+        : `<div class="band ok"><strong>${b.t} (${g.toFixed(1)})</strong><span>Follow his plan for what to do next, e.g. a snack if his next meal isn't soon.</span></div>
+          <button type="button" class="primary hy-cta" id="hy_done">Done · save to his log</button>`;
+      $("#hy_again")?.addEventListener("click", () => hyAgain(g));
+      $("#hy_done")?.addEventListener("click", () => hyDone(g));
+    });
+  }
+}
+async function hyStart(){
+  const g=num($("#hy_gl").value), c=num($("#hy_c").value), what=$("#hy_what").value.trim();
+  try { if("Notification" in window && Notification.permission==="default") await Notification.requestPermission(); } catch {}
+  try { hyAudio ??= new (window.AudioContext||window.webkitAudioContext)(); hyAudio.resume?.(); } catch {}
+  let id=null;
+  try { const r = await base.collection("log").add({type:"hypo", at:Date.now(), gl:g, ket:null, carbs:c, note:["Hypo mode", what].filter(Boolean).join(": "), by:me}); id=r.id; } catch(e){ toast("Couldn't save to the log, but the timer is running"); }
+  hy = {start:Date.now(), entryId:id, gl:g, carbs:c||0, round:1, readings:[g]}; hySave(); hyRun(); hyStep("wait");
+}
+async function hyAgain(g){
+  const c=num($("#hy_c2")?.value);
+  hy.round++; hy.start=Date.now(); hy.alerted=false; hy.carbs=(hy.carbs||0)+(c||0); hy.readings.push(g); hySave();
+  await hyUpdateEntry(`Recheck ${g.toFixed(1)} still low, treated again${c?` (${c} g)`:""}`); hyRun(); hyStep("wait");
+}
+async function hyDone(g){
+  hy.readings.push(g); await hyUpdateEntry(`Recheck ${g.toFixed(1)}, back up`);
+  hy=null; hySave(); clearInterval(hyTick); $("#hypoDlg").close(); renderHypoBanner(); toast("Hypo saved to his log");
+}
+async function hyUpdateEntry(add){
+  if(!hy?.entryId) return; const e=log.find(x=>x.id===hy.entryId); if(!e) return;
+  const u={...e, carbs:hy.carbs||e.carbs, note:[e.note, add].filter(Boolean).join(" · ")}; delete u.id;
+  try { await base.collection("log").doc(hy.entryId).set(u); } catch {}
+}
+function hyRun(){
+  clearInterval(hyTick); let fired = false;
+  hyTick = setInterval(() => {
+    const left=hyLeft(); const el=$("#hy_left"); if(el) el.textContent=mmss(left);
+    const arc=$("#hy_arc"); if(arc){ const L=2*Math.PI*52; arc.style.strokeDasharray=L; arc.style.strokeDashoffset = L*(1-left/(HY_MIN*6e4)); }
+    renderHypoBanner();
+    if(left===0 && !fired){ fired=true; if(!hy.alerted){ hy.alerted=true; hySave(); hyNotify(); } if($("#hypoDlg").open && $("#hy_left")) hyStep("recheck"); }
+  }, 500);
+}
+function openHypo(){
+  if(!canWrite) return toast("Saving isn't switched on here");
+  hyLoad(); $("#hypoDlg").showModal();
+  if(!hy) hyStep("start"); else if(hyLeft()>0) hyStep("wait"); else hyStep("recheck");
+}
+$("#hypoGo").addEventListener("click", openHypo);
+$("#hyClose").addEventListener("click", () => $("#hypoDlg").close());
+document.addEventListener("click", ev => { if(ev.target.closest("[data-hyopen]")) openHypo(); if(ev.target.closest("[data-hyclose]")) $("#hypoDlg").close(); });
+document.addEventListener("visibilitychange", () => { if(!document.hidden){ hyLoad(); if(hy) hyRun(); renderHypoBanner(); } });
+hyLoad(); if(hy) hyRun(); setTimeout(renderHypoBanner, 0);
+
+/* ---------- favourite foods ---------- */
+let foods = [], favManage = false;
+const favSort = () => foods.slice().sort((a,b)=>(b.uses||0)-(a.uses||0) || a.name.localeCompare(b.name));
+const findFav = name => foods.find(f => f.name.trim().toLowerCase() === String(name||"").trim().toLowerCase());
+function favBtn(f, cls=""){ return `<button type="button" class="fav ${cls} ${f.kind==="drink"?"is-drink":""}" data-fav="${esc(f.id)}"><span class="fav-n">${esc(f.name)}</span><span class="fav-c">${f.carbs!=null?f.carbs+" g":""}${f.kind==="drink"&&f.ml?` · ${f.ml} ml`:""}</span>${favManage&&!cls?'<span class="fav-ed">Edit</span>':""}</button>`; }
+function renderFavs(){
+  const L = favSort();
+  $("#favList").innerHTML = L.length ? L.map(f=>favBtn(f)).join("") : `<div class="empty">No usual foods yet. Tap <b>Add a food</b>, or tick "Add to his usual foods" when you log a meal.</div>`;
+  $("#favList").classList.toggle("managing", favManage);
+  $("#favManage").textContent = favManage ? "Done" : "Edit list"; $("#favManage").setAttribute("aria-pressed", favManage); $("#favManage").hidden = !L.length;
+  const q = $("#favQuick"); const top = L.slice(0,4); q.hidden = !top.length;
+  q.innerHTML = top.length ? `<div class="fav-q-h">His usual foods</div><div class="favs">${top.map(f=>favBtn(f,"mini")).join("")}</div>` : "";
+}
+function openFavDlg(f){
+  $("#favForm").reset(); $("#favForm").dataset.id = f?.id || "";
+  $("#favTitle").textContent = f ? "Edit food" : "Add a food"; $("#favDel").hidden = !f;
+  if(f){ $("#fv_name").value=f.name; $("#fv_kind").value=f.kind||"food"; $("#fv_carbs").value=f.carbs??""; $("#fv_portion").value=f.portion||""; $("#fv_ml").value=f.ml??""; }
+  favKind(); $("#favDlg").showModal();
+}
+function favKind(){ document.querySelectorAll("[data-fk]").forEach(el=>el.hidden = el.dataset.fk!==$("#fv_kind").value); }
+$("#fv_kind").addEventListener("change", favKind);
+$("#favAdd").addEventListener("click", () => canWrite ? openFavDlg(null) : toast("Saving isn't switched on here"));
+$("#favManage").addEventListener("click", () => { favManage=!favManage; renderFavs(); });
+$("#favCancel").addEventListener("click", () => $("#favDlg").close());
+$("#favForm").addEventListener("submit", async ev => {
+  ev.preventDefault(); const id=$("#favForm").dataset.id, old=foods.find(f=>f.id===id)||{};
+  const f = {...old, name:$("#fv_name").value.trim(), kind:$("#fv_kind").value, carbs:num($("#fv_carbs").value), portion:$("#fv_portion").value.trim(), ml:$("#fv_kind").value==="drink"?num($("#fv_ml").value):null};
+  delete f.id; if(!f.name) return;
+  const dup = findFav(f.name); if(dup && dup.id!==id) return toast("That food is already in the list");
+  try { if(id) await base.collection("foods").doc(id).set(f); else await base.collection("foods").add({...f, uses:0, lastUsed:null}); $("#favDlg").close(); toast(id?"Food updated":"Added to his usual foods"); }
+  catch(e){ toast(`Couldn't save (${e.code||e.message||"error"})`); }
+});
+$("#favDel").addEventListener("click", async () => { const id=$("#favForm").dataset.id; $("#favDlg").close(); try { await deleteWithUndo("foods", id, "Food"); } catch { toast("Couldn't delete"); } });
+function logFav(f){
+  if(favManage) return openFavDlg(f);
+  openEntry(f.kind==="drink"?"drink":"food");
+  $("#e_item").value = f.name; if(f.carbs!=null) $("#e_carbs").value = f.carbs; if(f.kind==="drink" && f.ml!=null) $("#e_ml").value = f.ml;
+  if(f.portion) $("#e_note").placeholder = "Usual portion: " + f.portion;
+  favState();
+}
+function favState(){ const t=$("#e_type").value, fd=(t==="food"||t==="drink") && !editingId; const v=$("#e_item").value.trim();
+  $("#e_favWrap").hidden = !fd || !v || !!findFav(v); }
+$("#e_item").addEventListener("input", favState);
+let editingId = null;
+function toLocalInput(ms){ const d=new Date(ms); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,16); }
+function openEdit(id){
+  const e = log.find(x=>x.id===id); if(!e) return toast("That entry has been deleted");
+  openEntry(e.type);
+  editingId = id; $("#dlgTitle").textContent = "Edit " + TYPES[e.type].label.toLowerCase(); $("#dlgDelete").hidden = false;
+  $("#e_at").value = toLocalInput(e.at);
+  const put = (sel,v) => { if(v!=null && v!=="") $(sel).value = v; };
+  put("#e_gl",e.gl); put("#e_ket",e.ket); put("#e_carbs",e.carbs); put("#e_item",e.item); put("#e_meal",e.meal); put("#e_ate",e.ate); put("#e_ml",e.ml); put("#e_note",e.note);
+}
 function openEntry(type, pre={}){
+  editingId = null; $("#dlgDelete").hidden = true;
   if(!canWrite){ (toast("Saving isn't switched on here. Open the page in a browser (see the note at the top)"), $("#dbNote").scrollIntoView({behavior:"smooth",block:"center"})); return; }
   $("#entryForm").reset(); $("#e_type").value = type; $("#e_at").value = localNow();
-  $("#dlgTitle").textContent = TYPES[type].label; setFields(type);
+  $("#dlgTitle").textContent = TYPES[type].label; setFields(type); $("#e_favWrap").hidden = true; $("#e_note").placeholder = "";
   if(type==="food"){ const h=new Date().getHours(); $("#e_meal").value = h<10?"Breakfast":h<11.5?"Morning snack":h<14?"Lunch":h<16.5?"Afternoon snack":h<19?"Dinner":"Bedtime snack"; }
   if(pre.gl!=null) $("#e_gl").value = pre.gl; if(pre.ket!=null) $("#e_ket").value = pre.ket;
   dlg.showModal();
@@ -254,19 +444,32 @@ function setFields(type){
 $("#e_type").addEventListener("change", e => setFields(e.target.value));
 $("#e_item").addEventListener("change", () => {
   const v = $("#e_item").value.trim().toLowerCase(); if(!v) return;
+  const fv = findFav(v); if(fv){ if($("#e_carbs").value==="" && fv.carbs!=null) $("#e_carbs").value = fv.carbs; if(fv.ml!=null && $("#e_ml").value==="") $("#e_ml").value = fv.ml; }
   const prev = log.find(e => (e.type==="food"||e.type==="drink") && (e.item||"").toLowerCase()===v);
   if(prev){ if(prev.carbs!=null && $("#e_carbs").value==="") $("#e_carbs").value = prev.carbs; if(prev.ml!=null && $("#e_ml").value==="") $("#e_ml").value = prev.ml; }
 });
 document.querySelectorAll("[data-q],[data-q2]").forEach(b => b.addEventListener("click", () => openEntry(b.dataset.q || b.dataset.q2)));
 $("#dlgCancel").addEventListener("click", () => dlg.close());
+$("#dlgDelete").addEventListener("click", async () => { const id=editingId; if(!id) return; dlg.close(); editingId=null; try { await deleteWithUndo("log", id, "Entry"); } catch { toast("Couldn't delete. Try again"); } });
+document.addEventListener("keydown", ev => { if((ev.key==="Enter"||ev.key===" ") && ev.target.matches?.(".meal.tap")){ ev.preventDefault(); openEdit(ev.target.dataset.ledit); } });
 $("#entryForm").addEventListener("submit", async ev => {
   ev.preventDefault();
   const e = { type:$("#e_type").value, at:new Date($("#e_at").value).getTime(), gl:num($("#e_gl").value), ket:num($("#e_ket").value), carbs:num($("#e_carbs").value), note:$("#e_note").value.trim(), by:me };
   if(e.type==="food"||e.type==="drink"){ e.item=$("#e_item").value.trim(); if(e.type==="food"){ e.meal=$("#e_meal").value; e.ate=$("#e_ate").value; } else { e.ml=num($("#e_ml").value); } e.gl=null; e.ket=null; }
   if(isNaN(e.at)) e.at = Date.now();
+  if(!editingId && $("#e_at").value===localNow()) e.at = Date.now();   // keep the exact time so two entries in the same minute stay in order
   $("#dlgSave").disabled = true;
   try {
+    if(editingId){
+      const old = log.find(x=>x.id===editingId) || {};
+      const upd = {...old, ...e, by: old.by || me, editedBy: me, editedAt: Date.now()}; delete upd.id; Object.keys(upd).forEach(k => upd[k]===undefined && delete upd[k]);
+      await base.collection("log").doc(editingId).set(upd);
+      editingId = null; dlg.close(); toast("Changes saved"); return;
+    }
     await base.collection("log").add(e);
+    if(e.type==="food"||e.type==="drink"){ const fv=findFav(e.item);
+      if(fv) base.collection("foods").doc(fv.id).update({uses:(fv.uses||0)+1, lastUsed:Date.now()}).catch(()=>{});
+      else if($("#e_fav").checked && e.item) base.collection("foods").add({name:e.item, kind:e.type, carbs:e.carbs, ml:e.ml??null, portion:"", uses:1, lastUsed:Date.now()}).catch(()=>{}); }
     const linked = supplies.filter(s => s.link && s.link === e.type && s.qty > 0);
     for (const s of linked) await base.collection("supplies").doc(s.id).update({qty: s.qty-1});
     dlg.close(); toast(linked.length ? "Saved · stock updated" : "Saved");
@@ -275,6 +478,8 @@ $("#entryForm").addEventListener("submit", async ev => {
 });
 let pendingDel = null;
 document.addEventListener("click", async ev => {
+  const le = ev.target.closest("[data-ledit]"); if(le){ openEdit(le.dataset.ledit); return; }
+  const fb = ev.target.closest("[data-fav]"); if(fb){ const f=foods.find(x=>x.id===fb.dataset.fav); if(f) logFav(f); return; }
   const d = ev.target.closest("[data-del]");
   if(d){
     d.disabled = true;
@@ -296,6 +501,7 @@ document.addEventListener("click", async ev => {
   }
 });
 $("#range").addEventListener("change", renderLog); $("#filter").addEventListener("change", renderLog);
+let searchT=null; $("#logSearch").addEventListener("input", () => { clearTimeout(searchT); searchT=setTimeout(renderLog, 150); });
 $("#copyClinic").addEventListener("click", e => copy($("#clinicText").textContent, e.currentTarget));
 ["#ketIn","#glIn","#vomIn"].forEach(s => $(s).addEventListener("input", renderSick));
 $("#logKet").addEventListener("click", () => openEntry("ketones", {ket:num($("#ketIn").value), gl:num($("#glIn").value)}));
@@ -646,7 +852,7 @@ function cgmStats(days){
 }
 
 /* ---- render ---- */
-function renderGlucose(){
+function renderGlucose(){ setTimeout(()=>{ renderBgNow(); renderBgChecks(); hypoState(); }, 0);
   const keys = Object.keys(cgmDays).sort();
   const days = +$("#gRange").value;
   const st = cgmStats(days);
@@ -991,10 +1197,163 @@ document.addEventListener("click", async ev => {
 
 
 
+
+
+/* ---------- BG: latest glucose + finger-prick checks ---------- */
+function allBgChecks(days=30){
+  const from = Date.now()-days*864e5, out=[];
+  for(const k of Object.keys(pumpDays)) for(const e of dayPump(k)) if(e.k===3 && e.t>=from) out.push({t:e.t, v:e.v, src:"Meter / pump file"});
+  for(const e of log) if(e.type==="bg" && e.gl!=null && e.at>=from) out.push({t:e.at, v:e.gl, src:"Logged", id:e.id, note:e.note});
+  return out.sort((a,b)=>b.t-a.t);
+}
+function latestCgm(){
+  const k = Object.keys(cgmDays).sort().pop(); if(!k) return null;
+  const pts = dayPoints(k); if(!pts.length) return null;
+  const last = pts[pts.length-1], prev = pts.filter(p=>p.t<=last.t-14*6e4 && p.t>=last.t-21*6e4).pop();
+  const rate = prev ? (last.v-prev.v)/((last.t-prev.t)/6e4)*15 : null;   // change over 15 minutes
+  return {t:last.t, v:last.v, src:"CGM file", rate};
+}
+function latestGlucose(){
+  const c = latestCgm(), b = allBgChecks(3650)[0];
+  return (!c || (b && b.t>c.t)) ? (b ? {...b, rate:null} : c) : c;
+}
+function bgBand(v){ const lo=hypoBelow(); return v<3 ? {c:"low",t:"Very low"} : v<lo ? {c:"low",t:"Low"} : v>13.9 ? {c:"high",t:"Very high"} : v>10 ? {c:"high",t:"High"} : {c:"ok",t:"In range"}; }
+function whenText(t){ const d=(midnight(Date.now())-midnight(t))/864e5, hm=new Date(t).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}); return d<=0 ? `Today ${hm}` : d===1 ? `Yesterday ${hm}` : new Date(t).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+" "+hm; }
+function renderBgNow(){
+  const el=$("#bgNow"); if(!el) return; const g=latestGlucose(); try { hypoState(); } catch {}
+  if(!g){ el.innerHTML = `<div class="bg-row"><div class="bg-big"><span class="k">Latest glucose</span><b class="muted">—</b><span class="bg-src">Upload his CGM file or log a finger prick</span></div><div class="bg-acts"><button type="button" class="small primary" data-bgupload>Upload CGM file</button><button type="button" class="small" data-bglog>Log a BG</button></div></div>`; return; }
+  const b=bgBand(g.v), ageH=(Date.now()-g.t)/36e5;
+  const arrow = g.rate==null ? "" : g.rate>=1.5 ? "↑" : g.rate>=0.5 ? "↗" : g.rate<=-1.5 ? "↓" : g.rate<=-0.5 ? "↘" : "→";
+  el.innerHTML = `<div class="bg-row"><div class="bg-big"><span class="k">Latest glucose</span><b class="bg-v ${b.c}">${g.v.toFixed(1)}<small> mmol/L</small>${arrow?`<span class="bg-arrow" aria-label="trend">${arrow}</span>`:""}</b><span class="bg-src"><span class="chip ${b.c}">${b.t}</span> ${whenText(g.t)} · ${g.src}</span></div>
+    <div class="bg-acts"><button type="button" class="small primary" data-bgupload>Upload CGM file</button><button type="button" class="small" data-bglog>Log a BG</button></div></div>
+    ${ageH>3?`<p class="bg-old">This is from ${ageH<48?Math.round(ageH)+" hours":Math.round(ageH/24)+" days"} ago, not live. Check his pump or CGM for now.</p>`:""}`;
+}
+function renderBgChecks(){
+  const st=$("#bgStats"), ul=$("#bgList"); if(!st) return;
+  const days=+($("#gRange")?.value||14), L=allBgChecks(days);
+  if(!L.length){ st.innerHTML=""; ul.innerHTML=`<li class="empty">No finger-prick readings in the last ${days} days. They come in with a full CareLink export, or log one with <b>Log a BG</b>.</li>`; return; }
+  const avg=L.reduce((a,x)=>a+x.v,0)/L.length, lows=L.filter(x=>x.v<hypoBelow()).length, perDay=L.length/days;
+  st.innerHTML = [["Checks",String(L.length),`about ${perDay<1?perDay.toFixed(1):Math.round(perDay)} a day`],["Average",avg.toFixed(1),"mmol/L"],["Low",String(lows),`under ${hypoBelow().toFixed(1)}`]]
+    .map(([k,v,n])=>`<div class="wk"><span class="k">${k}</span><b>${v}</b><small>${n}</small></div>`).join("");
+  ul.innerHTML = L.slice(0,30).map(x=>{ const b=bgBand(x.v); return `<li><span class="bg-t">${whenText(x.t)}</span><span class="bg-n">${x.src}${x.note?` · ${esc(x.note)}`:""}</span><span class="chip ${b.c} num">${x.v.toFixed(1)}</span></li>`; }).join("");
+}
+document.addEventListener("click", ev => { if(ev.target.closest("[data-bglog]")) openEntry("bg"); if(ev.target.closest("[data-bgupload]")){ location.hash="glucose"; setTimeout(()=>$("#gFile")?.click(), 50); } });
+
+/* ---------- weekly summary ---------- */
+function windowStats(fromMs, toMs){
+  const pts=[]; for(let t=midnight(fromMs); t<toMs; t+=864e5) pts.push(...dayPoints(ymd(t)).filter(p=>p.t>=fromMs && p.t<toMs));
+  const ev = log.filter(e=>e.at>=fromMs && e.at<toMs);
+  const foodDays = new Set(ev.filter(e=>e.type==="food").map(e=>dayKey(e.at)));
+  const carbs = ev.filter(e=>e.type==="food" && e.carbs!=null).reduce((a,e)=>a+e.carbs,0);
+  const out = {n:pts.length, hyposLogged: ev.filter(e=>e.type==="hypo").length, carbsDay: foodDays.size ? Math.round(carbs/foodDays.size) : null, foodDays: foodDays.size};
+  if(pts.length){ const inR=pts.filter(p=>p.v>=3.9&&p.v<=10).length, lo=pts.filter(p=>p.v<3.9).length; out.tir=inR/pts.length*100; out.low=lo/pts.length*100; out.mean=pts.reduce((a,p)=>a+p.v,0)/pts.length; out.cgmHypos=hypoEpisodes(pts).length; }
+  return out;
+}
+function weekSummary(){
+  const end = Date.now(), a = windowStats(end-7*864e5, end), b = windowStats(end-14*864e5, end-7*864e5);
+  const rows = mealOutcomes(7); const g={}; rows.forEach(r=>(g[r.key] ||= []).push(r));
+  const meals = Object.values(g).map(x=>({item:x[0].item, n:x.length, bad:x.filter(r=>r.high||r.low).length})).filter(m=>m.n>=2);
+  const best = meals.filter(m=>m.bad===0).sort((x,y)=>y.n-x.n)[0], worst = meals.filter(m=>m.bad/m.n>=0.5).sort((x,y)=>y.bad/y.n-x.bad/x.n)[0];
+  return {a, b, best, worst};
+}
+function renderWeek(){
+  const box=$("#weekPanel"); if(!box) return;
+  const {a,b,best,worst} = weekSummary();
+  if(!a.n && !a.foodDays && !a.hyposLogged){ box.hidden=true; return; }
+  box.hidden=false;
+  const d = (x,y,unit="",good="up") => (x==null||y==null) ? "" : (()=>{ const diff=x-y; if(Math.abs(diff)<0.5) return `<span class="wk-d same">same as last week</span>`; const better = good==="up" ? diff>0 : diff<0; return `<span class="wk-d ${better?"up":"down"}">${diff>0?"▲":"▼"} ${Math.abs(diff).toFixed(unit==="%"?0:1)}${unit} vs last week</span>`; })();
+  const isSun = new Date().getDay()===0;
+  box.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap"><h2>${isSun?"His week":"Last 7 days"}</h2><span class="muted" style="font-size:.85rem">${new Date(Date.now()-6*864e5).toLocaleDateString("en-GB",{day:"numeric",month:"short"})} – today</span></div>
+    <div class="wk-grid">
+      <div class="wk"><span class="k">In range</span><b>${a.tir!=null?Math.round(a.tir)+"%":"—"}</b>${d(a.tir,b.tir,"%","up")}</div>
+      <div class="wk"><span class="k">Hypos</span><b>${a.cgmHypos!=null?a.cgmHypos:a.hyposLogged}</b>${a.cgmHypos!=null?d(a.cgmHypos,b.cgmHypos,"","down"):d(a.hyposLogged,b.hyposLogged,"","down")}<small>${a.cgmHypos!=null?"from CGM":"logged"}</small></div>
+      <div class="wk"><span class="k">Average</span><b>${a.mean!=null?a.mean.toFixed(1):"—"}</b>${a.mean!=null?`<small>mmol/L</small>`:""}</div>
+      <div class="wk"><span class="k">Carbs a day</span><b>${a.carbsDay!=null?a.carbsDay+" g":"—"}</b>${a.foodDays?`<small>${a.foodDays} day${a.foodDays===1?"":"s"} logged</small>`:""}</div>
+    </div>
+    ${best||worst?`<div class="wk-meals">${best?`<div><span class="chip ok">Went well</span> ${esc(best.item)} <span class="muted">(${best.n}×, no highs or lows)</span></div>`:""}${worst?`<div><span class="chip high">Harder</span> ${esc(worst.item)} <span class="muted">(${worst.bad} of ${worst.n} times out of range)</span></div>`:""}</div>`:""}
+    ${a.n?"":`<p class="muted" style="margin:0;font-size:.85rem">Import his CGM file to see time in range here.</p>`}`;
+}
+
+/* ---------- setup check ---------- */
+let pushSubbed = null, offsite = null, remindersRun = null, pushMeta = {};
+async function pushReg(){ try { return ("serviceWorker" in navigator) ? await navigator.serviceWorker.getRegistration() : null; } catch { return null; } }
+async function checkPushSub(){ const r=await pushReg(); try { const s=await r?.pushManager?.getSubscription(); pushSubbed = !!s; } catch { pushSubbed=false; } renderSetup(); renderPush(); }
+function setupItems(){
+  const F = window.__family || null, inst = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  const lastCgm = Object.keys(cgmDays).sort().pop();
+  const bkAge = lastBackup ? (Date.now()-lastBackup)/36e5 : null;
+  return [
+    {ok: !!F, t:"Family app", d: F ? "Signed in and sharing with the family" : "This copy isn't the family app, so nothing is shared", href:"#backup", skip: !F},
+    {ok: F ? F.members>=2 : null, t:"His mum has joined", d: F ? (F.members>=2 ? `${F.members} people in the family` : "Only you so far. Share the family code from Care plan") : "Family app only", href:"#plan"},
+    {ok: F ? F.signupsClosed : null, t:"New sign-ups closed", d: F ? (F.signupsClosed===true ? "No one else can create an account" : F.signupsClosed===false ? "Anyone with the link can register. Turn off sign-ups in Supabase (Authentication → Sign In / Providers)" : "Couldn't check") : "Family app only"},
+    {ok: !!(P("name") && P("hypoTx")), t:"Care plan filled in", d: P("hypoTx") ? "Name and hypo treatment are set" + (P("teamDay")?"":" · add the diabetes team's number") : "Add his hypo treatment from his diabetes team", href:"#plan"},
+    {ok: bkAge!=null && bkAge<36, t:"Daily backup", d: bkAge==null ? "No backup yet" : bkAge<36 ? `Last backup ${ago(lastBackup)}` : `Last backup ${ago(lastBackup)}. Check backup-setup.sql was run in Supabase`, href:"#backup"},
+    {ok: offsite ? (Date.now()-offsite)/36e5<36 : (F?false:null), t:"Off-site backup (GitHub)", d: offsite ? `Last copy ${ago(offsite)}` : F ? "Not seen yet. Add daily-backup.yml and its 3 secrets in GitHub" : "Family app only"},
+    {ok: pushSubbed, t:"Notifications on this phone", d: pushSubbed ? "This phone gets reminders" : "Turn them on below", href:"#pushPanel"},
+    {ok: remindersRun ? (Date.now()-remindersRun)/36e5<30 : (F?false:null), t:"Reminder job (GitHub)", d: remindersRun ? `Last ran ${ago(remindersRun)}` : F ? "Not seen yet. Add reminders.yml and the VAPID_PRIVATE_KEY secret in GitHub" : "Family app only"},
+    {ok: supplies.length>0 && !!(delivery.last||delivery.next), t:"Supplies and deliveries", d: supplies.length ? (delivery.last||delivery.next ? `${supplies.length} items tracked, next delivery set` : "Set the delivery date on Supplies") : "Add his supplies and stock", href:"#supplies"},
+    {ok: !!lastCgm && (Date.now()-keyToMs(lastCgm))/864e5<15, t:"CGM data imported", d: lastCgm ? `Latest day: ${new Date(keyToMs(lastCgm)).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}` : "Import his CareLink file on Glucose", href:"#glucose"},
+    {ok: !!inst, t:"Installed on this phone", d: inst ? "Opens like an app" : "iPhone: Safari → Share → Add to Home Screen. Android: menu → Install app"},
+  ].filter(x=>!x.skip);
+}
+function renderSetup(){
+  const L=$("#setupList"); if(!L) return;
+  const items=setupItems(), done=items.filter(i=>i.ok===true).length, rel=items.filter(i=>i.ok!==null).length;
+  $("#setupScore").textContent = `${done} of ${rel} done`;
+  { const b=$("#bdgSetup"); if(b){ b.hidden = done>=rel; b.textContent = `${done} of ${rel} done`; } }
+  L.innerHTML = items.map(i=>`<li class="${i.ok===true?"ok":i.ok===null?"na":"todo"}">${i.href&&i.ok!==true?`<a href="${i.href}">`:"<div>"}<span class="su-ic">${i.ok===true?"✓":i.ok===null?"–":"!"}</span><span class="su-t"><b>${esc(i.t)}</b><small>${esc(i.d)}</small></span>${i.href&&i.ok!==true?"</a>":"</div>"}</li>`).join("");
+}
+try { navigator.serviceWorker?.ready.then(() => checkPushSub()); } catch {}
+addEventListener("hashchange", () => { if(location.hash==="#setup") checkPushSub(); });
+$("#setupRefresh").addEventListener("click", () => { checkPushSub(); window.__familyRefresh?.(); renderSetup(); toast("Checked"); });
+
+/* ---------- phone notifications (web push) ---------- */
+const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+const unb64u = s => Uint8Array.from(atob(s.replace(/-/g,"+").replace(/_/g,"/")+"===".slice((s.length+3)%4)), c=>c.charCodeAt(0));
+let newPrivKey = null;
+async function renderPush(){
+  const box=$("#pushBody"); if(!box) return;
+  const reg = await pushReg(); const ios = /iPhone|iPad/.test(navigator.userAgent), inst = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  if(!window.__family || !reg || !("PushManager" in window)){
+    box.innerHTML = `<div class="empty">${ios && !inst ? "On iPhone, notifications only work once the app is on the Home Screen: open it in Safari → Share → Add to Home Screen, then open it from there." : "Notifications work in the installed family app (on your Vercel link), not in this copy."}</div>`; return; }
+  if(Notification.permission==="denied"){ box.innerHTML = `<div class="band high"><strong>Notifications are blocked for this app</strong><span>Allow them in the phone's settings for this app, then come back.</span></div>`; return; }
+  if(newPrivKey){
+    box.innerHTML = `<div class="band high"><strong>One-time step: save this key in GitHub</strong><span>GitHub → your repo → Settings → Secrets and variables → Actions → New repository secret. Name: <code>VAPID_PRIVATE_KEY</code>. Value: the key below. It's shown only once and isn't stored in the app.</span></div>
+      <div class="keybox"><code id="vapidKey">${newPrivKey}</code><button type="button" class="small" id="copyKey">Copy</button></div>
+      <button type="button" class="primary" id="keyDone">I've saved it in GitHub</button>`;
+    $("#copyKey").onclick = async () => { try { await navigator.clipboard.writeText(newPrivKey); toast("Copied"); } catch { toast("Select the key and copy it"); } };
+    $("#keyDone").onclick = () => { newPrivKey=null; renderPush(); };
+    return;
+  }
+  box.innerHTML = pushSubbed
+    ? `<div class="band ok"><strong>On for this phone</strong><span>Reminders arrive in the morning and evening. Set them up on his mum's phone too.</span></div><div class="btns"><button type="button" id="pushTest">Send a test now</button><button type="button" id="pushOff">Turn off on this phone</button></div>`
+    : `<button type="button" class="primary" id="pushOn">Turn on notifications on this phone</button>${pushMeta.publicKey?"":`<p class="muted" style="font-size:.85rem;margin:0">The first time, the app makes a secret key for GitHub to send the reminders with. You'll copy it once.</p>`}`;
+  $("#pushOn")?.addEventListener("click", pushOn); $("#pushOff")?.addEventListener("click", pushOff);
+  $("#pushTest")?.addEventListener("click", async () => { const r=await pushReg(); r?.showNotification("T1D Care Hub", {body:"Test: notifications work on this phone.", icon:"/icon-192.png", tag:"t1d-test"}); });
+}
+async function pushOn(){
+  try {
+    const perm = await Notification.requestPermission(); if(perm!=="granted") return renderPush();
+    if(!pushMeta.publicKey){
+      const kp = await crypto.subtle.generateKey({name:"ECDSA", namedCurve:"P-256"}, true, ["sign","verify"]);
+      const pub = b64u(await crypto.subtle.exportKey("raw", kp.publicKey)), jwk = await crypto.subtle.exportKey("jwk", kp.privateKey);
+      await base.collection("meta").doc("push").set({publicKey: pub, at: Date.now(), by: me}); pushMeta = {publicKey: pub}; newPrivKey = jwk.d;
+    }
+    const reg = await pushReg();
+    const sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey: unb64u(pushMeta.publicKey)});
+    const j = sub.toJSON(); const id = b64u(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(j.endpoint))).slice(0,24);
+    await base.collection("push").doc(id).set({endpoint:j.endpoint, keys:j.keys, by:me, device:(navigator.userAgent.match(/iPhone|iPad|Android|Windows|Mac/)||["phone"])[0], at:Date.now()});
+    pushSubbed = true; toast("Notifications on"); renderPush(); renderSetup();
+  } catch(e){ toast("Couldn't turn on notifications: " + (e.message||e)); }
+}
+async function pushOff(){
+  try { const r=await pushReg(); const s=await r?.pushManager.getSubscription(); if(s){ const id=b64u(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s.endpoint))).slice(0,24); await s.unsubscribe(); await base.collection("push").doc(id).delete().catch(()=>{}); } pushSubbed=false; renderPush(); renderSetup(); toast("Notifications off on this phone"); } catch { toast("Couldn't turn off"); }
+}
+
 /* ===== design v3 helpers ===== */
 const VIEW_TITLES = {glucose:["Glucose","His CGM data, patterns and what they mean"], food:["Food & drink","Meals, drinks and how they affect his glucose"], log:["History","Everything you've logged, and the clinic summary"],
   supplies:["Supplies","Stock at home and the next delivery"], checks:["Growth & check-ups","Height, weight, eyes and teeth"], appts:["Appointments","GP, clinic, vaccinations and more"],
-  reports:["Reports","Round-ups to keep or share"], sick:["Sick day","What to do when he's unwell"], plan:["Care plan","His details, targets and contacts"], backup:["Backup","Keep a copy of everything"]};
+  reports:["Reports","Round-ups to keep or share"], sick:["Sick day","What to do when he's unwell"], plan:["Care plan","His details, targets and contacts"], backup:["Backup","Keep a copy of everything"], setup:["Setup check","Is everything switched on and working?"]};
 for (const [k,[t,sub]] of Object.entries(VIEW_TITLES)) { const sec = document.getElementById("v-"+k); const ic = document.querySelector(`#nav a[href="#${k}"] .ic`); if(!sec || sec.querySelector(".view-head")) continue;
   const h = document.createElement("div"); h.className = "view-head"; h.innerHTML = `<span class="vh-ic">${ic?ic.outerHTML:""}</span><div><h1>${t}</h1><p>${sub}</p></div>`; sec.prepend(h); }
 function labelCardTables(){ document.querySelectorAll("table.cards").forEach(t => { const hs=[...t.querySelectorAll("thead th")].map(th=>th.textContent.trim()); t.querySelectorAll("tbody tr").forEach(tr => [...tr.children].forEach((td,i)=>{ if(hs[i] && !td.hasAttribute("colspan")) td.dataset.label = hs[i]; })); }); }
@@ -1313,7 +1672,7 @@ document.addEventListener("click", async ev => {
 
 
 /* ================= BACKUP ================= */
-const BK_COLS = ["log","cgm","pump","growth","checks","supplies","appts"];
+const BK_COLS = ["log","cgm","pump","growth","checks","supplies","appts","foods"];
 let lastBackup = null, dl = null;
 function bkStatus(m){ const n=$("#bkStatus"); n.hidden=!m; n.textContent=m||""; }
 function renderBackup(){
@@ -1443,6 +1802,11 @@ renderAll();
   base.collection("meta").doc("delivery").onSnapshot(s => { delivery = s.exists ? s.data() : {}; renderDeliveries(); renderSupplies(); renderComing(); }, () => {});
   base.collection("meta").doc("backup").onSnapshot(s => { lastBackup = s.exists ? s.data().at : null; renderBackup(); renderStrip(); }, () => {});
   base.collection("supplies").onSnapshot(s => { supplies = s.docs.map(d => ({id:d.id, ...d.data()})); renderAll(); ok(s); }, fail);
+  base.collection("meta").doc("push").onSnapshot(s => { pushMeta = s.exists ? s.data() : {}; renderPush(); }, () => {});
+  base.collection("meta").doc("offsite").onSnapshot(s => { offsite = s.exists ? s.data().at : null; renderSetup(); }, () => {});
+  base.collection("meta").doc("pushlog").onSnapshot(s => { remindersRun = s.exists ? s.data().at : null; renderSetup(); }, () => {});
+  checkPushSub();
+  base.collection("foods").onSnapshot(s => { foods = s.docs.map(d => ({id:d.id, ...d.data()})); renderFavs(); renderItems(); }, () => {});
 })();
 async function loadNames(){
   if(!userCap?.profiles) return;

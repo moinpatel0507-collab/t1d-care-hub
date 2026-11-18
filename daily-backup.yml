@@ -37,10 +37,11 @@ jobs:
             const page = await r.json(); rows.push(...page); if (page.length < 1000) break;
           }
           if (!rows.length) { console.error('::error::No records found. Is SUPABASE_SECRET_KEY the secret (not publishable) key?'); process.exit(1); }
-          const COLS = ['log', 'cgm', 'pump', 'growth', 'checks', 'supplies', 'appts'];
+          const COLS = ['log', 'cgm', 'pump', 'growth', 'checks', 'supplies', 'appts', 'foods'];
           const fams = [...new Set(rows.map(r => r.family_id))];
           const day = new Date().toISOString().slice(0, 10);
           const fs = await import('fs');
+          fs.writeFileSync('families.json', JSON.stringify(fams));
           fams.forEach((fid, n) => {
             const mine = rows.filter(r => r.family_id === fid);
             const out = { app: 't1d-care-hub', version: 1, exportedAt: new Date().toISOString(), source: 'github-daily',
@@ -72,3 +73,21 @@ jobs:
           path: '*.enc'
           retention-days: 90
           if-no-files-found: error
+
+      - name: Tell the app the off-site backup worked
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          cat > mark.mjs <<'EOF'
+          const fs = await import('fs');
+          const base = new URL(process.env.SUPABASE_URL.trim()).origin, key = process.env.SUPABASE_SECRET_KEY.trim();
+          const headers = { apikey: key, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' };
+          if (key.startsWith('eyJ')) headers.Authorization = 'Bearer ' + key;
+          for (const fid of JSON.parse(fs.readFileSync('families.json', 'utf8'))) {
+            const r = await fetch(`${base}/rest/v1/records?on_conflict=family_id,collection,id`, { method: 'POST', headers,
+              body: JSON.stringify({ family_id: fid, collection: 'meta', id: 'offsite', data: { at: Date.now(), run: process.env.GITHUB_RUN_ID || '' }, updated_at: new Date().toISOString() }) });
+            console.log('marked', fid.slice(0, 8), r.status);
+          }
+          EOF
+          node mark.mjs

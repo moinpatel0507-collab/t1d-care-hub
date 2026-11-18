@@ -53,46 +53,56 @@ img{max-width:100%}
     <div class="nav-group">Settings</div>
     <a href="#plan" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zM9 11h6M9 15h4"/></svg><span>Care plan</span></a>
     <a href="#backup" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg><span>Backup</span></a>
+    <a href="#setup" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Setup check</span></a>
     <button type="button" id="moreBtn" class="more" aria-expanded="false" aria-controls="moreSheet"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg><span>More</span></button>
   </nav>
   <div id="moreSheet" class="sheet" hidden>
     <div class="sheet-in">
+      <form class="sheet-search" id="sheetSearch" role="search"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="sheetQ" placeholder="Search history, e.g. pasta" aria-label="Search history" autocomplete="off"></form>
       <div class="sheet-group">Every day</div>
       <a href="#log"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg><span>History</span></a>
       <div class="sheet-group">His health</div>
       <a href="#checks"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11M10 20V5M16 20v-6M2 20h20"/><path d="M20 4v6M17 7h6"/></svg><span>Growth</span></a>
       <a href="#sick"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 17.5v-6"/></svg><span>Sick day</span></a>
       <div class="sheet-group">At home</div>
-      <a href="#supplies"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5l9-4.5 9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></svg><span>Supplies</span></a>
+      <a href="#supplies"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5l9-4.5 9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></svg><span>Supplies</span><b class="sh-badge" id="bdgSupplies" hidden></b></a>
       <a href="#reports"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 17v-3M12 17v-6M15 17v-4"/></svg><span>Reports</span></a>
       <div class="sheet-group">Settings</div>
       <a href="#plan"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zM9 11h6M9 15h4"/></svg><span>Care plan</span></a>
       <a href="#backup"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg><span>Backup</span></a>
+      <a href="#setup"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Setup check</span><b class="sh-badge" id="bdgSetup" hidden></b></a>
     </div>
   </div>
 
   <!-- TODAY -->
   <section id="v-today" class="view" hidden>
+    <div id="hypoBanner" class="hypo-banner" hidden></div>
+    <button type="button" class="hypo-go" id="hypoGo"><span class="hg-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15M6 13l6 6 6-6"/></svg></span><span><b>He's low</b><small>Treatment steps and a 15-minute recheck</small></span></button>
+    <section class="panel bgnow" id="bgNow" aria-label="Latest glucose"></section>
+    <div class="today-top"><section class="rings" id="rings" aria-label="Infusion set and sensor"></section><section class="panel tstats" id="todayStats" aria-label="Today so far"></section></div>
     <div class="strip" id="strip"></div>
+    <div class="panel" id="weekPanel" hidden></div>
     <div class="panel" id="comingPanel">
       <div><h2>Coming days</h2><div class="muted">What's due this week, and the times his past data says to keep an eye on. Patterns from the last 14 days, not predictions.</div></div>
       <div class="twochart"><div class="mpcard"><h3>Coming up</h3><ul class="agenda" id="agenda"></ul></div><div class="mpcard"><h3>Be ready for</h3><ul class="plain" id="watchList"></ul></div></div>
     </div>
     <div class="cols">
     <div class="panel">
-      <div><h2>Log something</h2><div class="muted">Tap what just happened. The time fills in for you.</div></div>
+      <div class="ph"><h2>Log something</h2><span class="muted">Time fills in for you</span></div>
       <div class="qgrid">
+        <button class="qt t-bg" data-q="bg"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c3 4.5 6 7.6 6 11a6 6 0 0 1-12 0c0-3.4 3-6.5 6-11z"/><path d="M9.5 14.5h5"/></svg></span><span class="ql">BG</span><span class="qs">Finger-prick reading</span></button>
         <button class="qt t-food" data-q="food"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18M4.5 3v5a2.5 2.5 0 0 0 5 0V3M18 21V3c-2.2 0-3.5 3-3.5 7h3.5"/></svg></span><span class="ql">Food</span><span class="qs">Meal or snack</span></button>
         <button class="qt t-drink" data-q="drink"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12l-1.6 16.2a1 1 0 0 1-1 .8H8.6a1 1 0 0 1-1-.8z"/><path d="M6.6 10h10.8"/></svg></span><span class="ql">Drink</span><span class="qs">Milk, water, juice</span></button>
-        <button class="qt t-low" data-q="hypo"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15M6 13l6 6 6-6"/></svg></span><span class="ql">Hypo treated</span><span class="qs">Low and what you gave</span></button>
+        <button class="qt t-low" data-q="hypo"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15M6 13l6 6 6-6"/></svg></span><span class="ql">Hypo</span><span class="qs">Low and what you gave</span></button>
         <button class="qt t-high" data-q="high"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M6 11l6-6 6 6"/></svg></span><span class="ql">High</span><span class="qs">Correction or high note</span></button>
         <button class="qt t-ket" data-q="ketones"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6M10 3v6l-5.2 9.1A2 2 0 0 0 6.5 21h11a2 2 0 0 0 1.7-2.9L14 9V3"/><path d="M7 15h10"/></svg></span><span class="ql">Ketones</span><span class="qs">Blood ketone check</span></button>
-        <button class="qt t-blue" data-q="site"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></span><span class="ql">Site change</span><span class="qs">New pod or infusion set</span></button>
-        <button class="qt t-blue" data-q="sensor"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><path d="M12 4v2M12 18v2M4 12h2M18 12h2"/></svg></span><span class="ql">Sensor change</span><span class="qs">New CGM sensor</span></button>
+        <button class="qt t-blue" data-q="site"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></span><span class="ql">Site</span><span class="qs">New pod or infusion set</span></button>
+        <button class="qt t-blue" data-q="sensor"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><path d="M12 4v2M12 18v2M4 12h2M18 12h2"/></svg></span><span class="ql">Sensor</span><span class="qs">New CGM sensor</span></button>
         <button class="qt t-high" data-q="ill"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z"/></svg></span><span class="ql">Unwell</span><span class="qs">Illness or temperature</span></button>
         <button class="qt t-grey" data-q="activity"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></span><span class="ql">Activity</span><span class="qs">Play, swimming, park</span></button>
         <button class="qt t-grey" data-q="note"><span class="qi"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/></svg></span><span class="ql">Note</span><span class="qs">Question for clinic</span></button>
       </div>
+      <div id="favQuick" class="fav-quick" hidden></div>
       <a class="sick-link" href="#sick"><span>Unwell, or ketones high?</span><b>Open the sick-day guide →</b></a>
     </div>
     <div class="panel">
@@ -112,6 +122,7 @@ img{max-width:100%}
           <select id="filter" aria-label="Type"><option value="">All types</option></select>
         </div>
       </div>
+      <div class="search-row"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="logSearch" type="search" placeholder="Search everything, e.g. pasta, nursery, 2.9" autocomplete="off" aria-label="Search all entries"><span id="searchCount" class="muted"></span></div>
       <ul class="log" id="fullLog"></ul>
     </div>
     <div class="panel">
@@ -187,6 +198,12 @@ img{max-width:100%}
       <div><h2>His typical day</h2><div class="muted">All the days in the period stacked on top of each other. The dark line is the middle value at each time of day. The shaded areas show how much it varies from day to day.</div></div>
       <div class="chartbox" id="agpChart"></div>
     </div>
+    <div class="panel" id="bgPanel">
+      <div class="ph"><h2>Blood glucose checks</h2><button type="button" class="small primary" data-q2="bg">Log a BG</button></div>
+      <div class="muted" style="font-size:.9rem">Finger-prick readings from his pump/meter file and the ones you log here. Useful when the CGM and how he seems don't match.</div>
+      <div id="bgStats" class="bg-stats"></div>
+      <ul class="bg-list" id="bgList"></ul>
+    </div>
     <div class="panel" id="fromFile">
       <div><h2>From his pump and CGM file</h2><div class="muted">Everything else the import found: carbs entered in the pump, insulin doses, finger pricks, site changes and alerts, plus every hypo the CGM picked up.</div></div>
       <div class="strip" id="ffStrip"></div>
@@ -203,6 +220,13 @@ img{max-width:100%}
   <!-- FOOD -->
   <section id="v-food" class="view" hidden>
     <div class="strip" id="foodStrip"></div>
+    <div class="panel" id="favPanel">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end">
+        <div><h2>His usual foods</h2><div class="muted">Tap one to log it with the carbs already filled in. Check the time and how much he ate, then Save.</div></div>
+        <div class="btns"><button type="button" id="favAdd">Add a food</button><button type="button" id="favManage" aria-pressed="false">Edit list</button></div>
+      </div>
+      <div class="favs" id="favList"></div>
+    </div>
     <div class="panel">
       <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end">
         <div><h2>Today</h2><div class="muted">Carbs he actually ate, and what he drank.</div></div>
@@ -370,6 +394,18 @@ img{max-width:100%}
     </form>
   </section>
 
+  <!-- SETUP CHECK -->
+  <section id="v-setup" class="view" hidden>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end"><div><h2 id="setupScore">Setup</h2><div class="muted">Each line checks itself. Green means done. Tap a line that isn't green to go and fix it.</div></div><button type="button" class="small" id="setupRefresh">Check again</button></div>
+      <ul class="setup-list" id="setupList"></ul>
+    </div>
+    <div class="panel" id="pushPanel">
+      <div><h2>Phone notifications</h2><div class="muted">A buzz on this phone for: site change due, sensor change due, supplies to order, appointments today and tomorrow, a missed backup, and a Sunday summary of his week. Turn it on separately on each phone.</div></div>
+      <div id="pushBody"></div>
+    </div>
+  </section>
+
   <!-- BACKUP -->
   <section id="v-backup" class="view" hidden>
     <div class="panel" id="backupPanel">
@@ -401,8 +437,29 @@ img{max-width:100%}
       <label><span id="e_carbsLabel">Carbs <small>g</small></span><input id="e_carbs" type="number" step="1" min="0" inputmode="numeric"></label>
     </div>
     <datalist id="itemList"></datalist>
+    <label class="check" id="e_favWrap" hidden><input type="checkbox" id="e_fav"> Add to his usual foods</label>
     <label><span id="e_noteLabel">What happened / what you did</span><textarea id="e_note"></textarea></label>
-    <div class="btns" style="justify-content:flex-end"><button type="button" id="dlgCancel">Cancel</button><button class="primary" type="submit" id="dlgSave">Save</button></div>
+    <div class="btns" style="justify-content:flex-end"><button type="button" class="danger" id="dlgDelete" hidden style="margin-right:auto">Delete</button><button type="button" id="dlgCancel">Cancel</button><button class="primary" type="submit" id="dlgSave">Save</button></div>
+  </form>
+</dialog>
+
+<dialog id="hypoDlg" class="hypo-dlg" aria-labelledby="hyTitle">
+  <div class="hy-top"><h2 id="hyTitle">He's low</h2><button type="button" class="small" id="hyClose">Close</button></div>
+  <div id="hyBody"></div>
+</dialog>
+
+<dialog id="favDlg">
+  <form id="favForm" method="dialog">
+    <h2 id="favTitle">Add a food</h2>
+    <div class="grid2">
+      <label style="grid-column:1/-1">Name<input id="fv_name" required placeholder="e.g. Weetabix + whole milk" autocomplete="off"></label>
+      <label>Type<select id="fv_kind"><option value="food">Food</option><option value="drink">Drink</option></select></label>
+      <label>Carbs <small>g per portion</small><input id="fv_carbs" type="number" min="0" step="1" inputmode="numeric" required></label>
+      <label>Portion <small>optional</small><input id="fv_portion" placeholder="e.g. 1 biscuit + 100 ml milk"></label>
+      <label data-fk="drink" hidden>Amount <small>ml</small><input id="fv_ml" type="number" min="0" step="10" inputmode="numeric"></label>
+    </div>
+    <p class="muted" style="margin:0;font-size:.85rem">Use the carbs from the packet or his dietitian's list for the portion he usually has.</p>
+    <div class="btns" style="justify-content:flex-end"><button type="button" class="danger" id="favDel" hidden style="margin-right:auto">Delete</button><button type="button" id="favCancel">Cancel</button><button class="primary" type="submit">Save</button></div>
   </form>
 </dialog>
 

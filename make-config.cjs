@@ -15,4 +15,6 @@ let base = url; try { base = new URL(url).origin; } catch {}   // keep only http
 if (base !== url.replace(/\/$/, '')) console.warn('\n*** NOTE: VITE_SUPABASE_URL had extra text after the address. Using ' + base + ' ***\n');
 fs.writeFileSync('dist/config.js', 'window.T1D_CONFIG = ' + JSON.stringify({ url: base, key }) + ';\n');
 fs.writeFileSync('dist/sw.js', fs.readFileSync('sw.js', 'utf8').replace('__VERSION__', Date.now().toString(36)));
+// Android app (made with PWABuilder): its assetlinks.json proves the app and this website belong together
+if (fs.existsSync('assetlinks.json')) { fs.mkdirSync('dist/.well-known', { recursive: true }); fs.copyFileSync('assetlinks.json', 'dist/.well-known/assetlinks.json'); console.log('Android app link: .well-known/assetlinks.json added'); }
 console.log('T1D Care Hub built OK: ' + files.length + ' files + config.js' + (url ? ' (database: ' + url + ')' : ''));
