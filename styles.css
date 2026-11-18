@@ -838,6 +838,75 @@ dialog{background:var(--surface);color:var(--fg);border-radius:26px}
 .bk-older summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center;color:var(--accent);list-style:none}
 .bk-older summary::-webkit-details-marker{display:none}
 
+/* ===== v2.5 · colour and character ===== */
+:root{--page:#4338CA;--page-soft:#EEF0FF}
+html[data-view="today"]{--page:#4338CA;--page-soft:#EEF0FF}
+html[data-view="glucose"]{--page:#E11D48;--page-soft:#FFE4EA}
+html[data-view="food"]{--page:#16A34A;--page-soft:#E3F7EA}
+html[data-view="log"]{--page:#475467;--page-soft:#EAECF0}
+html[data-view="supplies"]{--page:#EA580C;--page-soft:#FFEDDF}
+html[data-view="checks"]{--page:#0D9488;--page-soft:#DDF6F2}
+html[data-view="appts"]{--page:#7C3AED;--page-soft:#EFE7FE}
+html[data-view="reports"]{--page:#2563EB;--page-soft:#E3EDFF}
+html[data-view="sick"]{--page:#DC2626;--page-soft:#FDE6E6}
+html[data-view="plan"]{--page:#4F46E5;--page-soft:#E9E9FF}
+html[data-view="backup"]{--page:#0891B2;--page-soft:#DDF3F9}
+html[data-view="setup"]{--page:#16A34A;--page-soft:#E3F7EA}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--page-soft:color-mix(in srgb,var(--page) 22%,#151B2E)}}
+:root[data-theme="dark"]{--page-soft:color-mix(in srgb,var(--page) 22%,#151B2E)}
+/* a soft wash of the page colour behind the top of every page */
+body{background:radial-gradient(900px 420px at 0% -10%, color-mix(in srgb,var(--page) 16%,transparent), transparent 70%),radial-gradient(700px 380px at 100% -15%, color-mix(in srgb,var(--page) 10%,transparent), transparent 70%),var(--bg)!important;background-attachment:fixed!important}
+/* page header: coloured icon tile beside the title */
+.view-head{display:flex!important;align-items:center;gap:14px}
+.view-head .vh-ic{display:grid!important;width:52px!important;height:52px!important;border-radius:16px!important;background:var(--page)!important;color:#fff!important;box-shadow:0 8px 20px color-mix(in srgb,var(--page) 30%,transparent)}
+.view-head .vh-ic .ic{width:26px;height:26px}
+/* section titles get a small coloured marker */
+.panel>h2:first-child,.panel>div:first-child>h2,.panel .ph>h2,.bk-h h2,.pl-h h2{display:flex;align-items:center;gap:10px}
+.panel>h2:first-child::before,.panel>div:first-child>h2::before,.panel .ph>h2::before{content:"";width:6px;height:20px;border-radius:3px;background:var(--page);flex:none}
+.bk-h h2::before,.pl-h h2::before{content:none}
+/* tab bar + sidebar pick up the page colour */
+nav#nav a[aria-current="page"],nav#nav .more.on{background:var(--page-soft)!important;color:var(--page)!important}
+.sheet-in a[aria-current="page"]{background:var(--page-soft)!important;color:var(--page)!important}
+button.primary{background:var(--page)!important;color:#fff!important}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) button.primary:not(#bgNow button){background:color-mix(in srgb,var(--page) 75%,#ffffff)!important;color:#0B1020!important}}
+:root[data-theme="dark"] button.primary{background:color-mix(in srgb,var(--page) 75%,#ffffff)!important;color:#0B1020!important}
+.hypo-dlg button.primary{background:#4F46E5!important;color:#fff!important}
+/* Today header: name in the page colour, greeting chip */
+html[data-view="today"] .hero h1{background:linear-gradient(90deg,#312E81,#6D28D9);-webkit-background-clip:text;background-clip:text;color:transparent!important}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"])[data-view="today"] .hero h1{background:linear-gradient(90deg,#C7D2FE,#DDD6FE);-webkit-background-clip:text;background-clip:text}}
+/* latest glucose: the card takes the colour of the reading */
+.bgnow{position:relative;overflow:hidden;color:#fff}
+.bgnow.band-ok{background:linear-gradient(135deg,#16A34A,#0F8A6A)!important}
+.bgnow.band-high{background:linear-gradient(135deg,#D97706,#B45309)!important}
+.bgnow.band-low{background:linear-gradient(135deg,#E5484D,#B42318)!important}
+.bgnow.band-none{background:linear-gradient(135deg,#4F46E5,#6D28D9)!important}
+.bgnow::after{content:"";position:absolute;right:-40px;top:-50px;width:180px;height:180px;border-radius:50%;background:rgb(255 255 255 / .10);pointer-events:none}
+.bgnow .k,.bgnow .bg-src,.bgnow .bg-v small,.bgnow b.muted{color:rgb(255 255 255 / .85)!important}
+.bgnow .bg-v,.bgnow .bg-v.ok,.bgnow .bg-v.low,.bgnow .bg-v.high,.bgnow .bg-arrow{color:#fff!important}
+.bgnow .bg-v{font-size:48px}
+.bgnow .chip{background:rgb(255 255 255 / .22)!important;color:#fff!important}
+#bgNow button.primary,:root #bgNow button.primary{background:#fff!important;color:#101828!important}
+#bgNow button:not(.primary){background:rgb(255 255 255 / .18)!important;color:#fff!important}
+.bgnow .bg-old{background:rgb(0 0 0 / .18);color:#fff}
+.bgnow>*{position:relative;z-index:1}
+/* rings sit on tinted cards */
+.ring-card:first-child{background:linear-gradient(180deg,var(--accent-soft),var(--surface) 70%)}
+.ring-card:last-child{background:linear-gradient(180deg,var(--teal-soft),var(--surface) 70%)}
+/* coloured empty states instead of a grey dot */
+.empty{background:color-mix(in srgb,var(--page) 6%,var(--surface))!important;color:var(--muted);border:1.5px dashed color-mix(in srgb,var(--page) 30%,transparent)!important}
+.empty::before{background:var(--page-soft) radial-gradient(circle at 50% 50%, var(--page) 0 6px, transparent 7px)!important;width:44px!important;height:44px!important;opacity:1!important}
+/* numbers in stat tiles use the page colour */
+.stat .v,.wk b,.gm .v{color:var(--page)}
+.stat.warn .v{color:var(--high)} .stat.bad .v{color:var(--low)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .stat .v,:root:not([data-theme="light"]) .wk b,:root:not([data-theme="light"]) .gm .v{color:color-mix(in srgb,var(--page) 60%,#ffffff)}}
+:root[data-theme="dark"] .stat .v,:root[data-theme="dark"] .wk b,:root[data-theme="dark"] .gm .v{color:color-mix(in srgb,var(--page) 60%,#ffffff)}
+/* coming days: dates as coloured pills */
+.agenda .when{display:inline-block;padding:3px 10px;border-radius:999px;background:var(--accent-soft);font-size:.75rem!important;width:max-content}
+.agenda .when.warn{background:var(--high-soft)} .agenda .when.bad{background:var(--low-soft)}
+/* cards lift a little */
+.panel,.ring-card,.stat{box-shadow:0 1px 2px rgb(16 24 40 / .04),0 8px 24px rgb(16 24 40 / .05)!important}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .panel,:root:not([data-theme="light"]) .ring-card,:root:not([data-theme="light"]) .stat{box-shadow:none!important}}
+
 /* ===== sign-in & family setup (family app) ===== */
 #authGate{position:fixed;inset:0;z-index:100;background:var(--bg);overflow-y:auto;display:grid;place-items:start center;padding:max(24px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
 .gate-card{width:min(460px,100%);margin-top:6vh;background:var(--surface);border-radius:22px;box-shadow:var(--shadow);padding:26px 22px;display:grid;gap:14px}

@@ -1221,8 +1221,8 @@ function bgBand(v){ const lo=hypoBelow(); return v<3 ? {c:"low",t:"Very low"} : 
 function whenText(t){ const d=(midnight(Date.now())-midnight(t))/864e5, hm=new Date(t).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}); return d<=0 ? `Today ${hm}` : d===1 ? `Yesterday ${hm}` : new Date(t).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+" "+hm; }
 function renderBgNow(){
   const el=$("#bgNow"); if(!el) return; const g=latestGlucose(); try { hypoState(); } catch {}
-  if(!g){ el.innerHTML = `<div class="bg-row"><div class="bg-big"><span class="k">Latest glucose</span><b class="muted">—</b><span class="bg-src">Upload his CGM file or log a finger prick</span></div><div class="bg-acts"><button type="button" class="small primary" data-bgupload>Upload CGM file</button><button type="button" class="small" data-bglog>Log a BG</button></div></div>`; return; }
-  const b=bgBand(g.v), ageH=(Date.now()-g.t)/36e5;
+  if(!g){ el.className = "panel bgnow band-none"; el.innerHTML = `<div class="bg-row"><div class="bg-big"><span class="k">Latest glucose</span><b class="muted">—</b><span class="bg-src">Upload his CGM file or log a finger prick</span></div><div class="bg-acts"><button type="button" class="small primary" data-bgupload>Upload CGM file</button><button type="button" class="small" data-bglog>Log a BG</button></div></div>`; return; }
+  const b=bgBand(g.v), ageH=(Date.now()-g.t)/36e5; el.className = "panel bgnow band-"+b.c;
   const arrow = g.rate==null ? "" : g.rate>=1.5 ? "↑" : g.rate>=0.5 ? "↗" : g.rate<=-1.5 ? "↓" : g.rate<=-0.5 ? "↘" : "→";
   el.innerHTML = `<div class="bg-row"><div class="bg-big"><span class="k">Latest glucose</span><b class="bg-v ${b.c}">${g.v.toFixed(1)}<small> mmol/L</small>${arrow?`<span class="bg-arrow" aria-label="trend">${arrow}</span>`:""}</b><span class="bg-src"><span class="chip ${b.c}">${b.t}</span> ${whenText(g.t)} · ${g.src}</span></div>
     <div class="bg-acts"><button type="button" class="small primary" data-bgupload>Upload CGM file</button><button type="button" class="small" data-bglog>Log a BG</button></div></div>
