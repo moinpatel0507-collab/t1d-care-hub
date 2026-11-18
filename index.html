@@ -150,13 +150,14 @@ img{max-width:100%}
       </div>
       <div id="deliveryCheck"></div>
     </div>
+    <div class="panel" id="rxPanel"></div>
     <div class="panel">
       <div><h2>Supplies</h2><div class="muted">Days left = stock × days each unit lasts. Linked items count down when you log a site or sensor change.</div></div>
       <div class="table-wrap"><table class="cards">
         <thead><tr><th>Item</th><th>In stock</th><th>Days left</th><th>Until next delivery</th><th>Status</th><th></th></tr></thead>
         <tbody id="supTable"></tbody>
       </table></div>
-      <div class="btns"><button class="primary" id="addSup">Add item</button><button id="starterSup">Add common pump + CGM items</button></div>
+      <div class="btns"><button class="primary" id="addSup">Add item</button><button id="orderMsg">Order message</button><button id="starterSup">Add common pump + CGM items</button></div>
     </div>
   </section>
 
@@ -205,7 +206,13 @@ img{max-width:100%}
       <div><h2>His typical day</h2><div class="muted">All the days in the period stacked on top of each other. The dark line is the middle value at each time of day. The shaded areas show how much it varies from day to day.</div></div>
       <div class="chartbox" id="agpChart"></div>
     </div>
+    <div class="panel" id="watchPanel">
+      <div class="ph"><h2>When to keep an eye on him</h2><span class="muted" id="watchSrc"></span></div>
+      <div id="watchBody"></div>
+    </div>
     <div class="panel" id="weekPanel" hidden></div>
+    <div class="panel" id="a1cPanel"></div>
+    <div class="panel" id="actPanel"></div>
     <div class="panel" id="bgPanel">
       <div class="ph"><h2>Blood glucose checks</h2><button type="button" class="small primary" data-q2="bg">Log a BG</button></div>
       <div class="muted" style="font-size:.9rem">Finger-prick readings from his pump/meter file and the ones you log here. Useful when the CGM and how he seems don't match.</div>
@@ -313,6 +320,7 @@ img{max-width:100%}
     <div class="panel">
       <div><h2>Reports</h2><div class="muted">A round-up for the two of you: how his glucose went, food, hypos, supplies and what's coming up. Download it as a PDF to keep or share.</div></div>
       <div class="grid2 rep-controls">
+        <label>Report for<select id="rpFor"><option value="family">The two of us</option><option value="team">Diabetes team (clinic pack)</option></select></label>
         <label>Period<select id="rpPeriod"><option value="7">Last 7 days</option><option value="14">Last 14 days</option><option value="30">Last 30 days</option><option value="month">Last calendar month</option><option value="custom">Choose dates</option></select></label>
         <label data-rp="custom" hidden>From<input id="rpFrom" type="date"></label>
         <label data-rp="custom" hidden>To<input id="rpTo" type="date"></label>
@@ -620,6 +628,27 @@ img{max-width:100%}
   </form>
 </dialog>
 
+<dialog id="orderDlg">
+  <form method="dialog" id="orderForm">
+    <h2>Order message</h2>
+    <p class="muted" style="margin:0;font-size:.9rem">Items that need ordering, with the usual amount. Change anything, then send it the way you normally order.</p>
+    <textarea id="or_text" rows="11" aria-label="Order message"></textarea>
+    <div class="btns order-btns"><button type="button" class="primary" id="orCopy">Copy</button><button type="button" id="orShare" hidden>Share</button><a class="btn" id="orMail" target="_blank" rel="noopener">Email</a><a class="btn" id="orWa" target="_blank" rel="noopener">WhatsApp</a><button type="button" id="orClose" class="push-right">Close</button></div>
+  </form>
+</dialog>
+<dialog id="a1cDlg">
+  <form id="a1cForm" method="dialog">
+    <h2>Add an HbA1c result</h2>
+    <div class="grid2">
+      <label>Date of the test<input id="a1_date" type="date" required></label>
+      <label>Result<input id="a1_val" type="number" step="0.1" min="1" inputmode="decimal" required></label>
+      <label>Unit<select id="a1_unit"><option value="mm">mmol/mol (UK)</option><option value="pc">%</option></select></label>
+      <label>Note <small>optional</small><input id="a1_note" placeholder="e.g. clinic, finger-prick test"></label>
+    </div>
+    <div class="btns" style="justify-content:flex-end"><button type="button" id="a1cCancel">Cancel</button><button class="primary" type="submit">Save</button></div>
+  </form>
+</dialog>
+<div id="parentAlert" class="parent-alert" role="alert" hidden></div>
 <dialog id="supDlg">
   <form id="supForm" method="dialog">
     <h2>Supply item</h2>

@@ -977,6 +977,40 @@ nav#nav .nav-ver{display:none}
 .do-chk span{display:flex;flex-direction:column} .do-chk b{font-weight:600} .do-chk small{color:var(--muted);font-size:13px}
 .do-chk.on b{text-decoration:line-through;color:var(--muted)}
 
+/* ===== v4.2 · when to keep an eye on him ===== */
+.wt-strip{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:3px}
+.wt-cell{height:56px;border-radius:10px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px;position:relative}
+.wt-cell span{font-size:11px;font-weight:700;color:var(--muted)}
+.wt-cell.low span,.wt-cell.high span{color:#fff}
+.wt-cell.now{outline:2.5px solid var(--fg);outline-offset:1px}
+.wt-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted)}
+.wt-legend span{display:inline-flex;align-items:center;gap:6px} .wt-legend i{width:12px;height:12px;border-radius:4px;display:inline-block}
+.wt-legend i.nowdot{background:transparent;outline:2px solid var(--fg)}
+.wt-next{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:16px;background:var(--low-soft)} .wt-next.high{background:var(--high-soft)}
+.wt-next b{color:var(--low);font-size:16px} .wt-next.high b{color:var(--high)} .wt-next span{font-size:13px;color:var(--muted)}
+.wt-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.wt-list li{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.wt-today{display:block;text-decoration:none;color:var(--low);padding:8px 10px;border-radius:12px;background:var(--low-soft);margin-bottom:2px}
+.wt-today.high{color:var(--high);background:var(--high-soft)}
+#watchList li:has(.wt-today){list-style:none;margin-left:-20px}
+/* v5 */
+.order-btns{flex-wrap:wrap}.order-btns .push-right{margin-left:auto}
+#or_text{width:100%;font:inherit;font-size:.95rem;line-height:1.45;padding:12px;border-radius:12px;border:1px solid var(--line,#d6dbe4);background:var(--surface,#fff);color:inherit;resize:vertical;min-height:200px}
+.rx-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.rx-row .v.bad{color:var(--low)}.rx-row .v.warn{color:var(--high)}
+.a1c-now{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;padding:12px 14px;border-radius:14px;background:var(--page-soft,var(--surface-2,#f3f5f9))}.a1c-now .k{width:100%;font-size:.8rem;font-weight:700;opacity:.75}.a1c-now b{font-size:1.4rem}
+.a1c-list,.act-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.a1c-list li{display:grid;grid-template-columns:auto auto 1fr auto;gap:4px 12px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--surface-2,rgba(0,0,0,.03))}
+.act-list li{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--surface-2,rgba(0,0,0,.03))}
+.act-list .chip{white-space:nowrap}
+@media (max-width:560px){.a1c-list li{grid-template-columns:1fr auto;gap:2px 12px}.a1c-list li>*{grid-column:1}.a1c-list li>button{grid-column:2;grid-row:1/4;align-self:center}.a1c-list .a1c-d{font-size:.8rem}.act-list li{flex-direction:column;align-items:flex-start}}
+.parent-alert{position:fixed;left:50%;top:max(12px,env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:90;width:min(560px,calc(100% - 24px));display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:14px 16px;border-radius:16px;background:var(--low,#c0322b);color:#fff;box-shadow:0 12px 32px rgba(0,0,0,.25)}
+.parent-alert[hidden]{display:none}.parent-alert b{display:block;font-size:1.05rem}.parent-alert span{font-size:.9rem;opacity:.95}
+.parent-alert .pa-items{display:grid;gap:8px;flex:1 1 260px}.parent-alert .btns{margin:0}
+.parent-alert .btns button{background:rgba(255,255,255,.2)!important;color:#fff!important;border:0!important;box-shadow:none!important}
+.parent-alert .btns button.primary{background:#fff!important;color:var(--low,#c0322b)!important}
+.rp-tod th,.rp-tod td{text-align:center;padding:4px 2px;font-size:11px}.rp-tod td:first-child,.rp-tod th:first-child{text-align:left;white-space:nowrap}
+.rp-bad{color:#c0322b;font-weight:700}.rp-warn{color:#a86100;font-weight:700}
+
 /* ===== sign-in & family setup (family app) ===== */
 #authGate{position:fixed;inset:0;z-index:100;background:var(--bg);overflow-y:auto;display:grid;place-items:start center;padding:max(24px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
 .gate-card{width:min(460px,100%);margin-top:6vh;background:var(--surface);border-radius:22px;box-shadow:var(--shadow);padding:26px 22px;display:grid;gap:14px}
