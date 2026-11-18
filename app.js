@@ -15,9 +15,11 @@ let db = null, base = null, plan = {}, log = [], supplies = [];
 let canWrite = false, me = null, names = {}, userCap = null;
 
 /* ---------- views ---------- */
-const VIEWS = ["today","glucose","food","log","insulin","dayout","supplies","checks","appts","reports","sick","plan","backup","setup"];
+const VIEWS = ["viewer","handover","today","glucose","food","log","insulin","dayout","supplies","checks","appts","reports","sick","plan","backup","setup"];
 function route(){
-  const v = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "today";
+  const h0 = location.hash.slice(1), viewerMode = typeof isViewer==="function" && isViewer();
+  const v = viewerMode ? "viewer" : (VIEWS.includes(h0) && h0!=="viewer" ? h0 : "today");
+  if(typeof countView==="function" && !viewerMode) countView(v);
   VIEWS.forEach(n => $("#v-"+n).hidden = n !== v); document.documentElement.dataset.view = v;
   document.querySelectorAll("#nav a, #moreSheet a").forEach(a => a.getAttribute("href") === "#"+v ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"));
   const secOn = !!document.querySelector('#nav a.sec[aria-current="page"]');
@@ -97,7 +99,7 @@ function renderHero(){ renderHeroRing(); try { $("#who").textContent = friendlyL
   const chips=[["Site",site.v.replace(" left",""),site.cls],["Carbs",t.carbs+" g",""],["Drinks",t.ml+" ml",""],["Last ate",lf?new Date(lf.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):"—",""],["Hypos 7d",String(wk),wk>=3?"warn":""]];
   $("#heroChips").innerHTML = chips.map(([k,v,c])=>`<div class="hchip ${c}"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>`).join("");
 }
-function renderAll(){ renderHero(); renderStrip(); renderRecent(); renderFood(); renderLog(); renderSupplies(); renderSick(); renderItems(); renderGlucose(); renderChecks(); renderBackup(); renderMealPatterns(); renderComing(); renderAppts(); renderDeliveries(); renderReport(); renderFavs(); renderWeek(); renderSetup(); renderBgNow(); renderBgChecks(); renderInsulin(); renderVial(); renderSick2(); renderDayOut(); renderWatch(); }
+function renderAll(){ if(typeof applyRole==="function"){ applyRole(); renderMonthCard(); renderHandoverTab(); } renderHero(); renderStrip(); renderRecent(); renderFood(); renderLog(); renderSupplies(); renderSick(); renderItems(); renderGlucose(); renderChecks(); renderBackup(); renderMealPatterns(); renderComing(); renderAppts(); renderDeliveries(); renderReport(); renderFavs(); renderWeek(); renderSetup(); renderBgNow(); renderBgChecks(); renderInsulin(); renderVial(); renderSick2(); renderDayOut(); renderWatch(); }
 const dayKey = ms => new Date(ms).toDateString();
 function dayTotals(key){ const es = log.filter(e => dayKey(e.at)===key && (e.type==="food"||e.type==="drink"));
   return { carbs: es.reduce((a,e)=>a+(e.carbs||0),0), ml: es.filter(e=>e.type==="drink").reduce((a,e)=>a+(e.ml||0),0), meals: es.filter(e=>e.type==="food").length, drinks: es.filter(e=>e.type==="drink").length, es }; }
@@ -1295,7 +1297,7 @@ applyNight(); setInterval(applyNight, 60000); document.addEventListener("visibil
 
 
 /* ---------- version ---------- */
-const APP_VERSION = "6.2";
+const APP_VERSION = "7.0";
 document.querySelectorAll(".ver-n").forEach(e => e.textContent = APP_VERSION);
 { const nav=$("#nav"); if(nav && !nav.querySelector(".app-ver")){ const d=document.createElement("div"); d.className="app-ver nav-ver"; d.textContent="Version "+APP_VERSION; nav.insertBefore(d, $("#moreBtn")); } }
 
@@ -1623,7 +1625,7 @@ async function pushOff(){
 /* ===== design v3 helpers ===== */
 const VIEW_TITLES = {glucose:["Glucose","His CGM data, patterns and what they mean"], food:["Food & drink","Meals, drinks and how they affect his glucose"], log:["History","Everything you've logged, and the clinic summary"],
   supplies:["Supplies","Stock at home and the next delivery"], checks:["Growth & check-ups","Height, weight, eyes and teeth"], appts:["Appointments","GP, clinic, vaccinations and more"],
-  reports:["Reports","Round-ups to keep or share"], sick:["Sick day","What to do when he's unwell"], plan:["Care plan","His details, targets and contacts"], backup:["Backup","Keep a copy of everything"], setup:["Setup check","Is everything switched on and working?"], insulin:["Insulin","From his pump file: what the pump gave"], dayout:["Day out","Plan food, drinks and the bag before you go"]};
+  reports:["Reports","Round-ups to keep or share"], handover:["Handover","His sheet for anyone looking after him, and a record of each handover"], sick:["Sick day","What to do when he's unwell"], plan:["Care plan","His details, targets and contacts"], backup:["Backup","Keep a copy of everything"], setup:["Setup check","Is everything switched on and working?"], insulin:["Insulin","From his pump file: what the pump gave"], dayout:["Day out","Plan food, drinks and the bag before you go"]};
 for (const [k,[t,sub]] of Object.entries(VIEW_TITLES)) { const sec = document.getElementById("v-"+k); const ic = document.querySelector(`#nav a[href="#${k}"] .ic`); if(!sec || sec.querySelector(".view-head")) continue;
   const h = document.createElement("div"); h.className = "view-head"; h.innerHTML = `<span class="vh-ic">${ic?ic.outerHTML:""}</span><div><h1>${t}</h1><p>${sub}</p></div>`; sec.prepend(h); }
 function labelCardTables(){ document.querySelectorAll("table.cards").forEach(t => { const hs=[...t.querySelectorAll("thead th")].map(th=>th.textContent.trim()); t.querySelectorAll("tbody tr").forEach(tr => [...tr.children].forEach((td,i)=>{ if(hs[i] && !td.hasAttribute("colspan")) td.dataset.label = hs[i]; })); }); }
@@ -1947,7 +1949,7 @@ document.addEventListener("click", async ev => {
 
 
 /* ================= BACKUP ================= */
-const BK_COLS = ["log","cgm","pump","growth","checks","supplies","appts","foods","photos","dayplans","hba1c","rx","settings","todos","trips"];
+const BK_COLS = ["log","cgm","pump","growth","checks","supplies","appts","foods","photos","dayplans","hba1c","rx","settings","todos","trips","handovers"];
 let lastBackup = null, dl = null, fileBackupAt = null;
 function bkStatus(m){ const n=$("#bkStatus"); n.hidden=!m; n.textContent=m||""; }
 function renderBackup(){
@@ -2364,6 +2366,132 @@ function tripNew(){ if(!canWrite) return toast("Saving isn't switched on here");
   const t={id, where:"", from, to, flying:false, abroad:false, tz:null, packed:{}}; trips[id]=t; tripCur=id; tripSave(t); renderTrip(); setTimeout(()=>$("#tr_where")?.focus(),50); }
 renderNudge(); renderSettings(); renderTodos(); renderTrip();
 
+/* ================= v7.0 ================= */
+/* --- Handover tab: the sheet + a record of each handover --- */
+var handovers = [];
+const HO_ITEMS = [["kit","Hypo kit"],["glucagon","Glucagon"],["meter","BG meter"],["spare","Spare set / reservoir"],["snacks","Snacks and drinks"],["sheet","Handover sheet"]];
+function renderHandoverTab(){
+  const sh=$("#hoTab"); if(!sh) return; sh.innerHTML = buildHandover();
+  const el=$("#hoRecList"); const rows=[...handovers].sort((a,b)=>b.at-a.at); const now=Date.now();
+  const tm = ms => new Date(ms).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+  const active = rows.find(r=>!r.backAt && r.at<=now && (!r.until || r.until>now-6*36e5));
+  $("#hoActive").hidden = !active; if(active) $("#hoActive").innerHTML = `<div><b>With ${esc(active.to)}</b><span>since ${tm(active.at)}${active.until?` · back about ${tm(active.until)}`:""}</span></div><button type="button" class="small primary" data-hoback="${esc(active.id)}">He's back</button>`;
+  $("#hoCount").textContent = rows.length ? `${rows.length} recorded` : "";
+  el.innerHTML = rows.length ? rows.slice(0,30).map(r=>`<li><div class="hr-top"><div><b>${esc(r.to)}</b><div class="muted" style="font-size:.85rem">${new Date(r.at).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})} · ${tm(r.at)}${r.until?"–"+tm(r.until):""}${r.where?" · "+esc(r.where):""}${r.backAt?` · back ${tm(r.backAt)}`:""}</div></div>
+      <div class="hr-act">${!r.backAt?`<button type="button" class="small" data-hoback="${esc(r.id)}">Back</button>`:""}<button type="button" class="small" data-hodel="${esc(r.id)}" aria-label="Delete">✕</button></div></div>
+      ${(r.items||[]).length?`<div class="hr-chips">${r.items.map(k=>`<span class="chip">${esc((HO_ITEMS.find(x=>x[0]===k)||[k,k])[1])}</span>`).join("")}</div>`:""}
+      ${r.gl!=null||r.ate||r.note?`<div class="hr-note">${[r.gl!=null?`Last BG ${r.gl.toFixed(1)}`:"", r.ate?`Last ate: ${esc(r.ate)}`:"", r.note?esc(r.note):""].filter(Boolean).join(" · ")}</div>`:""}</li>`).join("")
+    : `<li class="muted">No handovers recorded yet. Tap <b>Record a handover</b> each time someone else looks after him.</li>`;
+  document.querySelectorAll("[data-hoback]").forEach(b => b.onclick = async () => { const r=handovers.find(x=>x.id===b.dataset.hoback); if(!r) return; const {id,...body}=r; try { await base.collection("handovers").doc(id).set({...body, backAt:Date.now()}); toast("Marked as back"); } catch { toast("Couldn't save"); } });
+  el.querySelectorAll("[data-hodel]").forEach(b => b.onclick = () => deleteWithUndo("handovers", b.dataset.hodel, "Handover"));
+  const dl=$("#hoWhoList"); if(dl) dl.innerHTML = [...new Set(rows.map(r=>r.to))].slice(0,12).map(n=>`<option value="${esc(n)}"></option>`).join("");
+}
+$("#hoRecAdd").addEventListener("click", () => { if(!canWrite) return toast("Saving isn't switched on here"); $("#hoRecForm").reset(); const d=new Date(); $("#hr_date").value=ymd(Date.now()); $("#hr_from").value=pad2(d.getHours())+":"+pad2(d.getMinutes());
+  const g=typeof latestGlucose==="function"?latestGlucose():null; if(g && Date.now()-g.t<2*36e5) $("#hr_gl").value=g.v.toFixed(1);
+  const f=log.find(e=>e.type==="food"); if(f && Date.now()-f.at<6*36e5) $("#hr_ate").value=`${f.item||"Food"}${f.carbs!=null?` (${f.carbs} g)`:""} at ${new Date(f.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})}`;
+  $("#hoRecDlg").showModal(); });
+$("#hoRecCancel").addEventListener("click", () => $("#hoRecDlg").close());
+$("#hoRecForm").addEventListener("submit", async ev => { ev.preventDefault(); const to=$("#hr_to").value.trim(); if(!to) return;
+  const day=$("#hr_date").value, at=new Date(day+"T"+($("#hr_from").value||"09:00")).getTime(), u=$("#hr_until").value;
+  const body={to, at, until: u ? new Date(day+"T"+u).getTime() : null, where:$("#hr_where").value.trim(), items:[...document.querySelectorAll("#hoRecForm [data-hoitem]:checked")].map(c=>c.dataset.hoitem), gl:num($("#hr_gl").value), ate:$("#hr_ate").value.trim(), note:$("#hr_note").value.trim(), backAt:null, by:me};
+  try { await base.collection("handovers").add(body); $("#hoRecDlg").close(); toast("Handover recorded"); } catch { toast("Couldn't save"); } });
+$("#hoTabPdf").addEventListener("click", async e => { const btn=e.currentTarget; btn.disabled=true; const m=$("#hoTabMsg"); m.textContent="Making the PDF…";
+  try { const r = await htmlToPdf(`<div class="report-paper print ho-paper">${buildHandover()}</div>`, `Handover-sheet-${(P("name")||"T1D").replace(/[^\w-]+/g,"-")}.pdf`); m.textContent = r.status==="saved" ? "PDF saved." : ""; }
+  catch(err){ m.textContent = err.code==="declined" ? "Cancelled." : err.message==="load" ? "Couldn't load the PDF maker. Check your internet connection." : (err.message || "Couldn't make the PDF."); } finally { btn.disabled=false; } });
+
+/* --- Page-use counter (shared between both parents) --- */
+var usageDocs = {}, usageMine = null, usageTimer = null;
+function usageFlush(){ clearTimeout(usageTimer); usageTimer=null; if(usageMine && canWrite && me) base.collection("usage").doc(String(me)).set(usageMine).catch(()=>{}); }
+function countView(v){ if(!canWrite || !me) return; if(!usageMine) usageMine = usageDocs[me] ? JSON.parse(JSON.stringify(usageDocs[me])) : {counts:{}, last:{}, since:Date.now()};
+  usageMine.counts[v]=(usageMine.counts[v]||0)+1; usageMine.last[v]=Date.now(); if(!usageTimer) usageTimer=setTimeout(usageFlush, 20000);  if(v==="setup") setTimeout(renderUsage,0); }
+addEventListener("pagehide", () => { if(usageTimer) usageFlush(); });
+document.addEventListener("visibilitychange", () => { if(document.hidden && usageTimer) usageFlush(); });
+function renderUsage(){
+  const el=$("#usagePanel"); if(!el) return; const docs={...usageDocs}; if(usageMine && me) docs[me]=usageMine;
+  const all=Object.values(docs); const since = all.length ? Math.min(...all.map(d=>d.since||Date.now())) : Date.now(); const days=Math.max(0,Math.floor((Date.now()-since)/864e5));
+  const label = v => v==="today" ? "Today" : (VIEW_TITLES[v]?.[0] || v);
+  const rows = VIEWS.filter(v=>v!=="viewer").map(v=>({v, n:all.reduce((a,d)=>a+(d.counts?.[v]||0),0), last:Math.max(0,...all.map(d=>d.last?.[v]||0))})).sort((a,b)=>b.n-a.n);
+  const max = Math.max(1,...rows.map(r=>r.n));
+  el.innerHTML = `<div class="ph"><h2>Which pages you use</h2><span class="muted">${all.length>1?"both of you":"this account"} · ${days<1?"started today":days+" day"+(days===1?"":"s")}</span></div>
+    <div class="muted" style="font-size:.9rem">Counts how often each page is opened, on all your phones. After a month, pages nobody opens are the ones to hide or remove so the app stays simple.</div>
+    <ul class="use-list">${rows.map(r=>{ const stale = days>=21 && (!r.last || Date.now()-r.last>21*864e5); return `<li class="${stale?"stale":""}"><span>${esc(label(r.v))}</span><span class="use-bar"><i style="width:${Math.round(r.n/max*100)}%"></i></span><b>${r.n}</b>${stale?`<small>not opened in 3 weeks</small>`:""}</li>`; }).join("")}</ul>`;
+}
+
+/* --- Month in short (Today, first week of each month) --- */
+function monthSummary(){
+  const d=new Date(), a=new Date(d.getFullYear(), d.getMonth()-1, 1).getTime(), b=new Date(d.getFullYear(), d.getMonth(), 1).getTime()-1;
+  const pa=new Date(d.getFullYear(), d.getMonth()-2, 1).getTime(), pb=a-1;
+  const st=statsOf(ptsBetween(a,b)), sp=statsOf(ptsBetween(pa,pb)), L=log.filter(e=>e.at>=a&&e.at<=b);
+  return {a, b, name:new Date(a).toLocaleDateString("en-GB",{month:"long"}), st, sp, hyposCgm: st?hypoEpisodes(ptsBetween(a,b)).length:null, hyposP: sp?hypoEpisodes(ptsBetween(pa,pb)).length:null,
+    hyposLogged:L.filter(e=>e.type==="hypo").length, sites:L.filter(e=>e.type==="site").length, ill:new Set(L.filter(e=>e.type==="ill").map(e=>ymd(e.at))).size,
+    changes:(typeof setChanges!=="undefined"?setChanges:[]).filter(c=>c.at>=a&&c.at<=b), labs:(typeof a1c!=="undefined"?a1c:[]).filter(x=>x.at>=a&&x.at<=b)};
+}
+function renderMonthCard(){
+  const el=$("#monthCard"); if(!el) return; const d=new Date(), key=`t1d-month-${d.getFullYear()}-${d.getMonth()}`; let hid=false; try { hid=!!localStorage.getItem(key); } catch {}
+  if(d.getDate()>7 || hid || log.length<5){ el.hidden=true; return; }
+  const m=monthSummary(); const diff=(x,y,good,unit="",dp=0)=> x==null||y==null ? "" : (()=>{ const v=x-y; if(Math.abs(v)<(dp?0.1:1)) return `<i>same as before</i>`; return `<i class="${(good?v>0:v<0)?"up":"down"}">${v>0?"▲":"▼"} ${Math.abs(v).toFixed(dp)}${unit}</i>`; })();
+  el.hidden=false;
+  el.innerHTML = `<div class="ph"><h2>${esc(m.name)} in short</h2><button type="button" class="small" id="monthHide">Hide</button></div>
+    <div class="mo-grid">
+      <div><span class="k">In range</span><b>${m.st?Math.round(m.st.tir)+"%":"–"}</b>${m.st&&m.sp?diff(m.st.tir,m.sp.tir,true,"%"):""}</div>
+      <div><span class="k">Average</span><b>${m.st?m.st.mean.toFixed(1):"–"}</b>${m.st&&m.sp?diff(m.st.mean,m.sp.mean,false,"",1):""}</div>
+      <div><span class="k">CGM hypos</span><b>${m.hyposCgm??"–"}</b>${m.hyposCgm!=null&&m.hyposP!=null?diff(m.hyposCgm,m.hyposP,false):""}</div>
+      <div><span class="k">Treated</span><b>${m.hyposLogged}</b><i>hypos logged</i></div>
+    </div>
+    <p class="muted" style="margin:0;font-size:.9rem">${[m.sites?`${m.sites} site change${m.sites===1?"":"s"}`:"", m.ill?`unwell on ${m.ill} day${m.ill===1?"":"s"}`:"", m.changes.length?`${m.changes.length} pump setting change${m.changes.length===1?"":"s"}`:"", m.labs.length?`HbA1c ${Math.round(m.labs[0].mmol)}`:"", !m.st?"No CGM data imported for that month":""].filter(Boolean).join(" · ") || "A quiet month."}</p>
+    <div class="btns"><button type="button" class="small primary" id="monthReport">Full report</button></div>`;
+  $("#monthHide").onclick = () => { try { localStorage.setItem(key,"1"); } catch {} el.hidden=true; };
+  $("#monthReport").onclick = () => { location.hash="reports"; setTimeout(()=>{ $("#rpPeriod").value="month"; renderReport(); },60); };
+}
+
+/* --- Read-only family view (grandparents) --- */
+function isViewer(){ return window.__family?.role === "viewer"; }
+var roleShown = null, vArm = null;
+function applyRole(){
+  const r = isViewer() ? "viewer" : "parent";
+  if(r !== roleShown){ roleShown = r; if(r==="viewer") document.documentElement.dataset.role="viewer"; else delete document.documentElement.dataset.role; route(); }
+  if(r==="viewer") renderViewer(); else renderViewers();
+}
+function renderViewer(){
+  const F=window.__family||{}, nm=P("name")||"him"; $("#vwName").textContent = `${nm} today`;
+  const meName=(F.names||{})[me]||""; $("#vwWho").textContent = meName ? `Signed in as ${meName} · view only` : "View only";
+  $("#vwSick").hidden = !sick?.active;
+  $("#vwLow").innerHTML = `<b>If he's low (below ${hypoBelow()} mmol/L)</b><p>${esc(P("hypoTx")||"Follow his parents' instructions and call them.").replace(/\n/g,"<br>")}</p>${P("signs")?`<small>Signs: ${esc(P("signs"))}</small>`:""}<small>Unconscious, fitting or can't swallow: nothing by mouth, recovery position, call 999, then his parents.</small>`;
+  const since=Date.now()-24*36e5, L=log.filter(e=>e.at>=since).sort((a,b)=>b.at-a.at);
+  const who = id => id===me ? "You" : ((F.names||{})[id] || "His parents");
+  const what = e => e.type==="food"||e.type==="drink" ? [e.item, e.carbs!=null?e.carbs+" g carbs":"", e.ml?e.ml+" ml":""].filter(Boolean).join(" · ") : [e.gl!=null?e.gl.toFixed(1)+" mmol/L":"", e.note||""].filter(Boolean).join(" · ");
+  $("#vwCount").textContent = L.length ? `${L.length} in the last 24 hours` : "";
+  $("#vwList").innerHTML = L.length ? L.map(e=>`<li><span class="c-t">${new Date(e.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})}</span><span><span class="chip ${TYPES[e.type]?.chip||""}">${esc(TYPES[e.type]?.label||e.type)}</span> ${esc(what(e))}<small>${esc(who(e.by))}</small></span></li>`).join("") : `<li class="muted">Nothing logged in the last 24 hours.</li>`;
+  $("#vwSheet").innerHTML = buildHandover();
+}
+$("#vwOut").addEventListener("click", () => window.__signOut ? window.__signOut() : location.reload());
+function renderViewers(){
+  const el=$("#viewerPanel"); if(!el) return; const F=window.__family;
+  const head = `<div class="ph"><h2>Family who can view</h2></div>`;
+  if(!F){ el.innerHTML = head + `<p class="muted" style="margin:0">Grandparents and other family can get a view-only login in the shared family app on your phones.</p>`; return; }
+  if(F.viewerSql===false){ el.innerHTML = head + `<p class="muted" style="margin:0">One-time setup: in Supabase open <b>SQL Editor → New query</b>, paste the whole of <b>viewer-setup.sql</b> and press <b>Run</b>. Then reload the app.</p>`; return; }
+  const vs=F.viewers||[], code=F.viewerCode;
+  el.innerHTML = head + `<div class="muted" style="font-size:.9rem">For grandparents or family who babysit. They see the last 24 hours, what to do if he's low, and his care sheet. They can't log, change or delete anything, and can't see older history, glucose files or reports.</div>
+    ${code ? `<div class="nur-code"><span class="k">Family view code</span><b>${esc(code)}</b><span class="muted">Only for joining. Switch it off once they've joined.</span></div>
+      <div class="btns"><button type="button" class="small primary" id="vwShare">${navigator.share?"Share instructions":"Copy instructions"}</button><button type="button" class="small" id="vwNew">New code</button><button type="button" class="small" id="vwOff">Switch code off</button></div>`
+      : `<div class="btns"><button type="button" class="small primary" id="vwOn">Make a family view code</button></div>`}
+    <details class="nur-how"><summary>How they get a login</summary><ol>
+      <li>New sign-ups are closed, so make their login yourself: Supabase → <b>Authentication → Users → Add user → Create new user</b>. Enter their email and a password and tick <b>Auto confirm user</b>.</li>
+      <li>Send them the app link, that email and password, and the code.</li>
+      <li>They sign in, type their name (e.g. "Grandma") and tap <b>Join to view</b>.</li>
+      <li>Switch the code off here once they've joined.</li></ol></details>
+    <h3 style="margin:4px 0 0">Who can view</h3>
+    ${vs.length ? `<ul class="nur-list">${vs.map(c=>`<li><span>${esc(c.name)}</span><button type="button" class="small danger" data-vwdel="${esc(c.id)}">${vArm===c.id?"Tap again to remove":"Remove"}</button></li>`).join("")}</ul>` : `<p class="muted" style="margin:0">Nobody yet.</p>`}`;
+  const act = async (fn, okMsg) => { try { await fn(); if(okMsg) toast(okMsg); } catch(e){ toast(e.message || "Couldn't do that"); } renderViewers(); };
+  $("#vwOn") && ($("#vwOn").onclick = () => act(()=>window.__setViewerCode(true), "Code made"));
+  $("#vwNew") && ($("#vwNew").onclick = () => act(()=>window.__setViewerCode(true), "New code made. The old one no longer works"));
+  $("#vwOff") && ($("#vwOff").onclick = () => act(()=>window.__setViewerCode(false), "Code switched off. People who joined can still view"));
+  $("#vwShare") && ($("#vwShare").onclick = async () => { const t = `This is the app we use for ${P("name")||"our son"}'s diabetes. You can see what's happened today and what to do if he's low.\n1. Open ${location.origin}\n2. Sign in with the email and password we gave you\n3. Type your name, tap "Join to view" and enter this code: ${code}`;
+    if(navigator.share){ try { await navigator.share({text:t}); } catch {} } else { try { await navigator.clipboard.writeText(t); toast("Copied"); } catch { toast("Couldn't copy"); } } });
+  el.querySelectorAll("[data-vwdel]").forEach(b => b.onclick = () => { const id=b.dataset.vwdel; if(vArm!==id){ vArm=id; renderViewers(); setTimeout(()=>{ if(vArm===id){ vArm=null; renderViewers(); } }, 4000); return; } vArm=null; act(()=>window.__removeViewer(id), "Removed. They can't see anything now"); });
+}
+renderHandoverTab(); renderUsage(); renderMonthCard();
+
 /* tap outside a pop-up to close it */
 document.querySelectorAll("dialog").forEach(dg => dg.addEventListener("click", e => { if(e.target!==dg) return; const r=dg.getBoundingClientRect(); if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom) dg.close(); }));
 /* ---------- storage ---------- */
@@ -2399,6 +2527,8 @@ renderAll();
   base.collection("settings").onSnapshot(s => { setChanges = s.docs.map(d => ({id:d.id, ...d.data()})); renderSettings(); }, () => {});
   base.collection("todos").onSnapshot(s => { todos = s.docs.map(d => ({id:d.id, ...d.data()})); renderTodos(); renderComing(); }, () => {});
   base.collection("trips").onSnapshot(s => { trips = {}; s.docs.forEach(d => { const x=d.data(); if(x?.id) trips[x.id]=x; }); const a=document.activeElement; if(!($("#tripPanel")?.contains(a) && a.tagName==="INPUT" && a.type!=="checkbox")) renderTrip(); renderComing(); }, () => {});
+  base.collection("handovers").onSnapshot(s => { handovers = s.docs.map(d => ({id:d.id, ...d.data()})); renderHandoverTab(); }, () => {});
+  base.collection("usage").onSnapshot(s => { usageDocs = {}; s.docs.forEach(d => usageDocs[d.id] = d.data()); renderUsage(); }, () => {});
   base.collection("foods").onSnapshot(s => { foods = s.docs.map(d => ({id:d.id, ...d.data()})); renderFavs(); renderItems(); }, () => {});
 })();
 async function loadNames(){

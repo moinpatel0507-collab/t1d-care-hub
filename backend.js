@@ -9,7 +9,7 @@ const KEY = (window.T1D_CONFIG || {}).key;
 export const supabase = URL && KEY && createClient ? createClient(URL, KEY, { auth: { persistSession: true, autoRefreshToken: true } }) : null;
 
 const ROOT = 'family/t1d';           // path prefix the app uses
-let familyId = null, me = null, members = [], family = null;
+let familyId = null, me = null, members = [], family = null, role = 'parent', viewerSql = true;
 const cache = new Map();             // "collection/id" -> data
 const listeners = new Set();         // functions to call after any change
 let readyResolve; const ready = new Promise(r => (readyResolve = r));
@@ -297,6 +297,7 @@ function showFamilySetup() {
       <div><h2>First parent</h2><p class="muted" style="font-size:.85rem">Creates the family and a code to share.</p><button class="primary" id="mk">Create family</button></div>
       <div><h2>Second parent</h2><label>Family code<input id="f_code" maxlength="8" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="e.g. 7F3A9C21"></label><button id="jn">Join family</button></div>
     </div>
+    <div class="gate-viewer"><h2>Grandparent or family (view only)</h2><p class="muted" style="font-size:.85rem">Use the view code his parents gave you. You'll see today's entries, what to do if he's low, and his care sheet.</p><label>View code<input id="f_vcode" maxlength="8" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="e.g. V1D53555"></label><button id="jnv">Join to view</button></div>
     <p class="gate-msg" aria-live="polite"></p>
     <button type="button" class="linkbtn" id="out">Sign out</button>`);
   const name = () => gate.querySelector('#f_name').value.trim();
@@ -316,6 +317,14 @@ function showFamilySetup() {
     if (error) return msg(/not found/i.test(error.message) ? "That code didn't match a family. Check it with the first parent." : /full/i.test(error.message) ? 'That family already has 4 people.' : error.message, true);
     start();
   };
+  gate.querySelector('#jnv').onclick = async () => {
+    const code = gate.querySelector('#f_vcode').value.replace(/\s/g, '').toUpperCase();
+    if (!name()) return msg('Enter your name first, e.g. Grandma.', true);
+    if (!/^V[0-9A-F]{7}$/.test(code)) return msg('View codes start with V and have 8 letters and numbers. Check it with his parents.', true);
+    msg('Joining…'); const { error } = await supabase.rpc('join_as_viewer', { p_code: code, p_name: name() });
+    if (error) return msg(/not found/i.test(error.message) ? "That code didn't work. His parents may have switched it off or made a new one." : /too many/i.test(error.message) ? 'This family already has 6 people who can view.' : /function|schema cache|does not exist/i.test(error.message) ? "View-only access isn't set up yet. Ask his parents to run viewer-setup.sql." : error.message, true);
+    start();
+  };
 }
 
 let started = false, recovering = RECOVERY;
@@ -325,37 +334,44 @@ async function start() {
   if (recovering) return showNewPassword();
   me = session.user.id;
   let mem = null, error = null;
-  try { ({ data: mem, error } = await supabase.from('family_members').select('family_id, user_id, display_name, families(invite_code)').eq('user_id', me).limit(1)); } catch (e) { error = e; }
+  try { ({ data: mem, error } = await supabase.from('family_members').select('family_id, user_id, display_name, role, families(invite_code, viewer_code)').eq('user_id', me).limit(1)); } catch (e) { error = e; }
+  if (error && /role|viewer_code|42703|PGRST/i.test((error.message || '') + (error.code || '')) && !isNetErr(error)) {   // viewer-setup.sql not run yet
+    viewerSql = false; try { ({ data: mem, error } = await supabase.from('family_members').select('family_id, user_id, display_name, families(invite_code)').eq('user_id', me).limit(1)); } catch (e) { error = e; } }
   if (error && isNetErr(error)) return startOffline();
   if (error) { screen(`<h1>Can't reach the database</h1><p class="muted">${esc(error.message)}</p><button class="primary" onclick="location.reload()">Try again</button>`); return; }
   if (!mem.length) return showFamilySetup();
-  familyId = mem[0].family_id; family = mem[0].families;
-  const { data: all } = await supabase.from('family_members').select('user_id, display_name').eq('family_id', familyId);
-  members = all || [];
-  idb.set('fam', { me, familyId, family, members });
+  familyId = mem[0].family_id; family = mem[0].families; role = mem[0].role || 'parent';
+  if (role === 'viewer') members = [{ user_id: me, display_name: mem[0].display_name, role }];
+  else { const { data: all } = await supabase.from('family_members').select(viewerSql ? 'user_id, display_name, role' : 'user_id, display_name').eq('family_id', familyId); members = all || []; }
+  idb.set('fam', { me, familyId, family, members, role });
   queue = (await idb.get('queue:' + familyId)) || [];
   if (queue.length) await flushQueue();
   try { await loadAll(); } catch (e) { if (isNetErr(e)) return startOffline(); screen(`<h1>Couldn't load your data</h1><p class="muted">${esc(e.message)}</p><button class="primary" onclick="location.reload()">Try again</button>`); return; }
   gate.hidden = true; gate.innerHTML = '';
   offline = false; syncPill(); exposeFamily();
-  if (!started) { started = true; subscribe(); addFamilyPanel(); addAccountChip(); addAutoBackupPanel(); readyResolve(); }
+  if (!started) { started = true; subscribe(); if (role !== 'viewer') { addFamilyPanel(); addAutoBackupPanel(); } addAccountChip(); readyResolve(); }
   else if (!subscribed) subscribe();
 }
 function exposeFamily() {
-  window.__family = { members: members.length, code: family?.invite_code || '', signupsClosed: window.__family?.signupsClosed ?? null };
+  const parents = members.filter(m => (m.role || 'parent') === 'parent');
+  window.__family = { members: parents.length, code: role === 'viewer' ? '' : (family?.invite_code || ''), signupsClosed: window.__family?.signupsClosed ?? null,
+    role, viewerSql, viewerCode: family?.viewer_code || '', viewers: members.filter(m => m.role === 'viewer').map(m => ({ id: m.user_id, name: m.display_name || 'Family' })),
+    names: Object.fromEntries(members.map(m => [m.user_id, m.display_name || ''])) };
+  if (role === 'viewer') return;
   fetch(URL.replace(/\/+$/, '') + '/auth/v1/settings', { headers: { apikey: KEY } }).then(r => r.ok ? r.json() : null)
     .then(j => { if (j && 'disable_signup' in j) { window.__family.signupsClosed = !!j.disable_signup; notify(); } }).catch(() => {});
 }
-window.__familyRefresh = async () => { try { const { data } = await supabase.from('family_members').select('user_id, display_name').eq('family_id', familyId); if (data) members = data; } catch {} exposeFamily(); notify(); };
+window.__familyRefresh = async () => { if (role === 'viewer') return; try { const { data } = await supabase.from('family_members').select(viewerSql ? 'user_id, display_name, role' : 'user_id, display_name').eq('family_id', familyId); if (data) members = data;
+  if (viewerSql) { const { data: f } = await supabase.from('families').select('invite_code, viewer_code').eq('id', familyId).limit(1); if (f && f[0]) family = f[0]; } } catch {} exposeFamily(); notify(); };
 async function startOffline() {
   const fam = await idb.get('fam');
   if (!fam || fam.me !== me) { screen(`<h1>No connection</h1><p class="muted">The app needs the internet the first time you sign in on this phone. After that it works without signal.</p><button class="primary" onclick="location.reload()">Try again</button>`); return; }
-  ({ familyId, family, members } = fam); offline = true; window.__family = { members: members.length, code: family?.invite_code || '', signupsClosed: null };
+  ({ familyId, family, members } = fam); role = fam.role || 'parent'; offline = true; exposeFamily();
   queue = (await idb.get('queue:' + familyId)) || [];
   const snap = (await idb.get('snap:' + familyId)) || [];
   const m = new Map(snap); applyQueue(m); cache.clear(); m.forEach((v, k) => cache.set(k, v));
   gate.hidden = true; gate.innerHTML = '';
-  if (!started) { started = true; addFamilyPanel(); addAccountChip(); readyResolve(); }
+  if (!started) { started = true; if (role !== 'viewer') addFamilyPanel(); addAccountChip(); readyResolve(); }
   notify(); syncPill();
 }
 async function goOnline() {
@@ -374,13 +390,13 @@ function addAccountChip() {
   const w = document.createElement('div'); w.id = 'acct'; w.className = 'acct';
   w.innerHTML = `<button type="button" class="acct-btn" aria-haspopup="true" aria-expanded="false"><span class="acct-av">${esc(meName.slice(0,1).toUpperCase())}</span><span class="acct-nm">${esc(meName)}</span></button>
     <div class="acct-menu" hidden><div class="acct-who">Signed in as <strong>${esc(meName)}</strong></div>
-    <a href="#plan" class="acct-item">Family code &amp; members</a><button type="button" class="acct-item acct-out">Sign out</button></div>`;
+    ${role === 'viewer' ? '' : '<a href="#plan" class="acct-item">Family code &amp; members</a>'}<button type="button" class="acct-item acct-out">Sign out</button></div>`;
   top.appendChild(w);
   const btn = w.querySelector('.acct-btn'), menu = w.querySelector('.acct-menu');
   const close = () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
   btn.onclick = (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); };
   document.addEventListener('click', (e) => { if (!w.contains(e.target)) close(); });
-  w.querySelector('a.acct-item').onclick = () => { close(); setTimeout(() => document.querySelector('#v-plan .panel:last-child')?.scrollIntoView({ behavior: 'smooth' }), 150); };
+  const fm = w.querySelector('a.acct-item'); if (fm) fm.onclick = () => { close(); setTimeout(() => document.querySelector('#v-plan .panel:last-child')?.scrollIntoView({ behavior: 'smooth' }), 150); };
   w.querySelector('.acct-out').onclick = async () => { w.querySelector('.acct-out').textContent = 'Signing out…'; await idb.clear(); await supabase.auth.signOut(); location.reload(); };
 }
 function addFamilyPanel() {
@@ -389,7 +405,7 @@ function addFamilyPanel() {
   p.innerHTML = `<div><h2>Family &amp; account</h2><div class="muted">Give this code to his mum. She creates her own account, then taps <em>Join family</em> and enters it.</div></div>
     <div class="strip" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
       <div class="stat"><span class="k">Family code</span><span class="v" style="user-select:all">${esc(family?.invite_code || '—')}</span><span class="n">Keep it private</span></div>
-      <div class="stat"><span class="k">Members</span><span class="v">${members.length}</span><span class="n">${esc(members.map(m => m.user_id === me ? (m.display_name || 'You') + ' (you)' : m.display_name || 'Parent').join(', '))}</span></div>
+      <div class="stat"><span class="k">Parents</span><span class="v">${members.filter(m => (m.role || 'parent') === 'parent').length}</span><span class="n">${esc(members.filter(m => (m.role || 'parent') === 'parent').map(m => m.user_id === me ? (m.display_name || 'You') + ' (you)' : m.display_name || 'Parent').join(', '))}</span></div>
     </div>
     <div class="btns"><button type="button" id="copyFam">Copy code</button>${navigator.share ? '<button type="button" id="shareFam">Share code</button>' : ''}<button type="button" id="signOut">Sign out</button></div>`;
   host.appendChild(p);
@@ -397,6 +413,11 @@ function addFamilyPanel() {
   const sf = p.querySelector('#shareFam'); if (sf) sf.onclick = () => navigator.share({ text: `Join our T1D Care Hub. Open ${location.origin}, create an account, tap Join family and enter this code: ${family?.invite_code}` }).catch(() => {});
   p.querySelector('#signOut').onclick = async () => { await idb.clear(); await supabase.auth.signOut(); location.reload(); };
 }
+
+/* view-only family access (parents) */
+window.__setViewerCode = async (on) => { const { data, error } = await supabase.rpc('set_viewer_code', { p_on: !!on }); if (error) throw err(error); family = { ...(family || {}), viewer_code: data || null }; exposeFamily(); notify(); return data; };
+window.__removeViewer = async (uid) => { const { error } = await supabase.rpc('remove_viewer', { p_user: uid }); if (error) throw err(error); await window.__familyRefresh(); };
+window.__signOut = async () => { await idb.clear(); await supabase.auth.signOut(); location.reload(); };
 
 /* ---------------- automatic daily backups (see supabase/backup-setup.sql) ---------------- */
 const ukDay = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: 'Europe/London' });   // YYYY-MM-DD

@@ -52,6 +52,15 @@ Upload the changed files the same way. Phones get the new version next time the 
 
 iPhone: notifications only work when the app has been added to the Home Screen (Safari → Share → Add to Home Screen) and is opened from there.
 
+## Version 7: view-only access for grandparents (5 minutes)
+1. Supabase → **SQL Editor → New query**. Paste the whole of `viewer-setup.sql` and press **Run**. Safe to run again.
+2. In the app: **Care plan → Family who can view → Make a family view code**.
+3. New sign-ups are closed, so make their login yourself: Supabase → **Authentication → Users → Add user → Create new user**. Enter their email and a password, tick **Auto confirm user**.
+4. Send them the app link, that email and password, and the code (**Share instructions** writes the message).
+5. They sign in, type their name and tap **Join to view**. Then switch the code off.
+
+They see the last 24 hours, what to do if he's low, and his care sheet. They can't add, change or delete anything, and can't see older history, glucose files, reports or backups. Remove them any time from the same panel.
+
 ## Version 6: instant alerts when the app is closed (15 minutes)
 Buzzes the other parents' phones the moment someone logs a hypo or starts sick-day mode.
 

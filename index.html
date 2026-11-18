@@ -49,6 +49,7 @@ img{max-width:100%}
     <a href="#appts" class="pri"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h3"/></svg><span class="l-long">Appointments</span><span class="l-short">Appts</span></a>
     <a href="#checks" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11M10 20V5M16 20v-6M2 20h20"/><path d="M20 4v6M17 7h6"/></svg><span>Growth</span></a>
     <a href="#sick" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 17.5v-6"/></svg><span>Sick day</span></a>
+    <a href="#handover" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6v3H9z"/><path d="M15 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/><path d="M9 13l2 2 4-4"/></svg><span>Handover</span></a>
     <div class="nav-group">At home</div>
     <a href="#supplies" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5l9-4.5 9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></svg><span>Supplies</span></a>
     <a href="#reports" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 17v-3M12 17v-6M15 17v-4"/></svg><span>Reports</span></a>
@@ -68,6 +69,7 @@ img{max-width:100%}
       <div class="sheet-group">His health</div>
       <a href="#checks"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11M10 20V5M16 20v-6M2 20h20"/><path d="M20 4v6M17 7h6"/></svg><span>Growth</span></a>
       <a href="#sick"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 17.5v-6"/></svg><span>Sick day</span></a>
+      <a href="#handover"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6v3H9z"/><path d="M15 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/><path d="M9 13l2 2 4-4"/></svg><span>Handover</span></a>
       <div class="sheet-group">At home</div>
       <a href="#supplies"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5l9-4.5 9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></svg><span>Supplies</span><b class="sh-badge" id="bdgSupplies" hidden></b></a>
       <a href="#reports"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 17v-3M12 17v-6M15 17v-4"/></svg><span>Reports</span></a>
@@ -89,6 +91,7 @@ img{max-width:100%}
     <div class="nudge" id="importNudge" role="status" hidden></div>
     <div class="today-top"><section class="rings" id="rings" aria-label="Infusion set and sensor"></section></div>
     <div class="strip" id="strip"></div>
+    <div class="panel month-card" id="monthCard" hidden></div>
     <div class="panel" id="comingPanel">
       <div><h2>Coming days</h2><div class="muted">What's due this week, and the times his past data says to keep an eye on. Patterns from the last 14 days, not predictions.</div></div>
       <div class="twochart"><div class="mpcard"><h3>Coming up</h3><ul class="agenda" id="agenda"></ul></div><div class="mpcard"><h3>Be ready for</h3><ul class="plain" id="watchList"></ul></div></div>
@@ -419,6 +422,7 @@ img{max-width:100%}
       </div>
       <div class="plan-bar"><span class="plan-state" id="planState">All saved</span><button class="primary" type="submit" id="savePlan">Save care plan</button></div>
     </form>
+    <div class="panel" id="viewerPanel"></div>
   </section>
 
   <!-- DAY OUT -->
@@ -475,10 +479,36 @@ img{max-width:100%}
       <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end"><div><h2 id="setupScore">Setup</h2><div class="muted">Only the one-time setup: sharing, safety and backups. Each line checks itself; tap one that isn't green to fix it.</div></div><button type="button" class="small" id="setupRefresh">Check again</button></div>
       <ul class="setup-list" id="setupList"></ul>
     </div>
+    <div class="panel" id="usagePanel"></div>
     <div class="panel" id="pushPanel">
       <div><h2>Phone notifications</h2><div class="muted">A buzz on this phone for: site change due, sensor change due, supplies to order, appointments today and tomorrow, a missed backup, and a Sunday summary of his week. Turn it on separately on each phone.</div></div>
       <div id="pushBody"></div>
     </div>
+  </section>
+
+  <!-- HANDOVER -->
+  <section id="v-handover" class="view" hidden>
+    <div class="ho-active" id="hoActive" hidden></div>
+    <div class="panel">
+      <div class="ph"><h2>Handover record</h2><span class="muted" id="hoCount"></span></div>
+      <div class="muted" style="font-size:.9rem">Each time grandparents, a babysitter or the nursery look after him: who, when, what you gave them, and his last BG and meal.</div>
+      <div class="btns"><button type="button" class="primary" id="hoRecAdd">Record a handover</button></div>
+      <ul class="ho-rec" id="hoRecList"></ul>
+    </div>
+    <div class="panel">
+      <div class="ph"><h2>His handover sheet</h2><button type="button" class="small" onclick="location.hash='plan'">Edit details</button></div>
+      <div class="btns"><button type="button" class="primary small" id="hoTabPdf">Download PDF</button><span class="muted" id="hoTabMsg" style="align-self:center;font-size:.85rem">Print it, or send it to whoever is looking after him.</span></div>
+      <div class="rep-scroll"><div id="hoTab" class="report-paper ho-paper"></div></div>
+    </div>
+  </section>
+
+  <!-- FAMILY VIEW (read only) -->
+  <section id="v-viewer" class="view" hidden>
+    <div class="carer-head"><div><span class="muted">T1D Care Hub</span><h1 id="vwName">Today</h1><p class="muted" id="vwWho"></p></div><button type="button" class="small" id="vwOut">Sign out</button></div>
+    <div class="notice" id="vwSick" hidden><b>He's unwell today (sick day).</b> His parents are checking ketones. Call them if he vomits, seems drowsy or is breathing fast.</div>
+    <div class="vw-low" id="vwLow"></div>
+    <div class="panel"><div class="ph"><h2>Last 24 hours</h2><span class="muted" id="vwCount"></span></div><ul class="c-list" id="vwList"></ul></div>
+    <div class="panel"><h2>His care sheet</h2><div class="rep-scroll"><div class="report-paper ho-paper" id="vwSheet"></div></div></div>
   </section>
 
   <!-- BACKUP -->
@@ -677,6 +707,25 @@ img{max-width:100%}
       <label>Note <small>optional</small><input id="st_note" placeholder="e.g. breakfast only" autocomplete="off"></label>
     </div>
     <div class="btns" style="justify-content:flex-end"><button type="button" id="setCancel">Cancel</button><button class="primary" type="submit">Save</button></div>
+  </form>
+</dialog>
+<dialog id="hoRecDlg">
+  <form id="hoRecForm" method="dialog">
+    <h2>Record a handover</h2>
+    <div class="grid2">
+      <label style="grid-column:1/-1">Who is looking after him<input id="hr_to" list="hoWhoList" required placeholder="e.g. Grandma, Little Stars nursery" autocomplete="off"><datalist id="hoWhoList"></datalist></label>
+      <label>Date<input id="hr_date" type="date" required></label>
+      <label>Where <small>optional</small><input id="hr_where" placeholder="e.g. her house" autocomplete="off"></label>
+      <label>From<input id="hr_from" type="time" required></label>
+      <label>Back about <small>optional</small><input id="hr_until" type="time"></label>
+    </div>
+    <fieldset class="ho-items"><legend>What you gave them</legend><label class="do-chk"><input type="checkbox" data-hoitem="kit"><span><b>Hypo kit</b></span></label><label class="do-chk"><input type="checkbox" data-hoitem="glucagon"><span><b>Glucagon</b></span></label><label class="do-chk"><input type="checkbox" data-hoitem="meter"><span><b>BG meter</b></span></label><label class="do-chk"><input type="checkbox" data-hoitem="spare"><span><b>Spare set / reservoir</b></span></label><label class="do-chk"><input type="checkbox" data-hoitem="snacks"><span><b>Snacks and drinks</b></span></label><label class="do-chk"><input type="checkbox" data-hoitem="sheet"><span><b>Handover sheet</b></span></label></fieldset>
+    <div class="grid2">
+      <label>Last BG <small>mmol/L</small><input id="hr_gl" type="number" step="0.1" min="1" max="33" inputmode="decimal"></label>
+      <label>Last ate <small>optional</small><input id="hr_ate" placeholder="e.g. toast (15 g) at 08:00" autocomplete="off"></label>
+      <label style="grid-column:1/-1">Notes <small>optional</small><input id="hr_note" placeholder="e.g. site changed this morning, nap at 1pm" autocomplete="off"></label>
+    </div>
+    <div class="btns" style="justify-content:flex-end"><button type="button" id="hoRecCancel">Cancel</button><button class="primary" type="submit">Save</button></div>
   </form>
 </dialog>
 <dialog id="supDlg">
