@@ -844,6 +844,7 @@ html[data-view="today"]{--page:#4338CA;--page-soft:#EEF0FF}
 html[data-view="glucose"]{--page:#E11D48;--page-soft:#FFE4EA}
 html[data-view="food"]{--page:#16A34A;--page-soft:#E3F7EA}
 html[data-view="log"]{--page:#475467;--page-soft:#EAECF0}
+html[data-view="insulin"]{--page:#0369A1;--page-soft:#E0F0FB}
 html[data-view="supplies"]{--page:#EA580C;--page-soft:#FFEDDF}
 html[data-view="checks"]{--page:#0D9488;--page-soft:#DDF6F2}
 html[data-view="appts"]{--page:#7C3AED;--page-soft:#EFE7FE}
@@ -906,6 +907,30 @@ html[data-view="today"] .hero h1{background:linear-gradient(90deg,#312E81,#6D28D
 /* cards lift a little */
 .panel,.ring-card,.stat{box-shadow:0 1px 2px rgb(16 24 40 / .04),0 8px 24px rgb(16 24 40 / .05)!important}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .panel,:root:not([data-theme="light"]) .ring-card,:root:not([data-theme="light"]) .stat{box-shadow:none!important}}
+
+/* ===== v3 · insulin, insulin in use, night mode ===== */
+.in-chart{overflow-x:auto}
+.in-bars{display:flex;align-items:flex-end;gap:6px;height:180px;min-width:max-content;padding-top:4px}
+.in-bar{flex:1 0 24px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:4px;min-width:24px}
+.in-bar i{display:block;width:100%;max-width:28px;border-radius:8px 8px 4px 4px;background:var(--page)} .in-bar i.none{background:var(--sunk)}
+.in-v{font-size:11px;font-weight:700;color:var(--muted)} .in-d{font-size:12px;font-weight:600;color:var(--muted)}
+.in-tod{display:grid;gap:10px}
+.tod{display:grid;grid-template-columns:92px minmax(0,1fr) 64px;gap:10px;align-items:center}
+.tod-n{font-weight:700;font-size:14px;display:flex;flex-direction:column} .tod-n small{font-weight:500;color:var(--muted);font-size:12px}
+.tod-bar{height:14px;border-radius:999px;background:var(--sunk);overflow:hidden} .tod-bar i{display:block;height:100%;border-radius:999px;background:var(--page)}
+.tod b{text-align:right;font-size:15px}
+.vial{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.vial-t{display:flex;flex-direction:column;gap:6px;flex:1;min-width:200px} .vial-t h2{margin:0} .vial-t p{margin:0;font-size:15px}
+.vial.bad .rc-in b{color:var(--low)} .vial.warn .rc-in b{color:var(--high)}
+.night-sw{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;padding:6px 12px;border-radius:14px;background:var(--sunk);margin:8px 0 4px;cursor:pointer}
+.night-sw span{display:flex;flex-direction:column} .night-sw small{color:var(--muted);font-size:12px;font-weight:500}
+.night-sw input{appearance:none;-webkit-appearance:none;width:48px;height:28px;border-radius:999px;background:var(--line);position:relative;flex:none;cursor:pointer;padding:0;border:0;min-height:0}
+.night-sw input::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .15s;box-shadow:0 1px 3px rgb(0 0 0 / .25)}
+.night-sw input:checked{background:var(--accent)} .night-sw input:checked::after{transform:translateX(20px)}
+/* dark rules that were only tied to the phone's own setting also follow night mode */
+:root[data-theme="dark"][data-view="today"] .hero h1{background:linear-gradient(90deg,#C7D2FE,#DDD6FE);-webkit-background-clip:text;background-clip:text}
+:root[data-theme="dark"] .panel,:root[data-theme="dark"] .ring-card,:root[data-theme="dark"] .stat{box-shadow:none!important}
+:root[data-theme="dark"] body{color-scheme:dark}
 
 /* ===== sign-in & family setup (family app) ===== */
 #authGate{position:fixed;inset:0;z-index:100;background:var(--bg);overflow-y:auto;display:grid;place-items:start center;padding:max(24px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}

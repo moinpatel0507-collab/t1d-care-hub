@@ -71,6 +71,9 @@ jobs:
             if (site) { const due = site + (n(plan.siteDays) ?? 3) * D; if (due - NOW < 14 * 36e5) items.push({ k: 'site:' + ukDate(due), title: `Site change ${left(due)}`, body: `${name[0].toUpperCase() + name.slice(1)}'s infusion set was changed ${ago(site)} ago.`, url: '/#today' }); }
             const sensor = lastOf('sensor');
             if (sensor) { const due = sensor + (n(plan.sensorDays) ?? 10) * D; if (due - NOW < 14 * 36e5) items.push({ k: 'sensor:' + ukDate(due), title: `Sensor change ${left(due)}`, body: `Sensor was put in ${ago(sensor)} ago.`, url: '/#today' }); }
+            // opened insulin: remind from 2 days before its last day
+            const vial = lastOf('vial');
+            if (vial) { const due = vial + (n(plan.vialDays) ?? 28) * D; if (due - NOW < 2 * D) items.push({ k: 'vial:' + ukDate(due), title: due < NOW ? 'Opened insulin is past its days' : 'Start a new insulin soon', body: `Opened ${ago(vial)} ago. Use by ${new Date(due).toLocaleDateString('en-GB', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short' })}.`, url: '/#supplies' }); }
             // supplies to order (mornings, every other day)
             if (!evening) {
               const low = col('supplies').filter(s => (s.qty || 0) * (s.days || 0) <= (s.lead ?? 14));

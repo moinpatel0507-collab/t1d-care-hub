@@ -3,7 +3,7 @@
 
 (() => {
 const TYPES = {
-  bg:{label:"BG check",chip:"blue"}, hypo:{label:"Hypo treated",chip:"low"}, high:{label:"High / correction",chip:"high"}, ketones:{label:"Ketones",chip:"urgent"},
+  bg:{label:"BG check",chip:"blue"}, vial:{label:"Insulin opened",chip:"blue"}, hypo:{label:"Hypo treated",chip:"low"}, high:{label:"High / correction",chip:"high"}, ketones:{label:"Ketones",chip:"urgent"},
   site:{label:"Site / pod change",chip:"blue"}, sensor:{label:"Sensor change",chip:"blue"}, ill:{label:"Unwell",chip:"high"},
   activity:{label:"Activity",chip:""}, note:{label:"Note",chip:""},
   food:{label:"Food",chip:"food"}, drink:{label:"Drink",chip:"drink"}
@@ -15,7 +15,7 @@ let db = null, base = null, plan = {}, log = [], supplies = [];
 let canWrite = false, me = null, names = {}, userCap = null;
 
 /* ---------- views ---------- */
-const VIEWS = ["today","glucose","food","log","supplies","checks","appts","reports","sick","plan","backup","setup"];
+const VIEWS = ["today","glucose","food","log","insulin","supplies","checks","appts","reports","sick","plan","backup","setup"];
 function route(){
   const v = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "today";
   VIEWS.forEach(n => $("#v-"+n).hidden = n !== v); document.documentElement.dataset.view = v;
@@ -97,7 +97,7 @@ function renderHero(){ renderHeroRing(); try { $("#who").textContent = friendlyL
   const chips=[["Site",site.v.replace(" left",""),site.cls],["Carbs",t.carbs+" g",""],["Drinks",t.ml+" ml",""],["Last ate",lf?new Date(lf.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):"—",""],["Hypos 7d",String(wk),wk>=3?"warn":""]];
   $("#heroChips").innerHTML = chips.map(([k,v,c])=>`<div class="hchip ${c}"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>`).join("");
 }
-function renderAll(){ renderHero(); renderStrip(); renderRecent(); renderFood(); renderLog(); renderSupplies(); renderSick(); renderItems(); renderGlucose(); renderChecks(); renderBackup(); renderMealPatterns(); renderComing(); renderAppts(); renderDeliveries(); renderReport(); renderFavs(); renderWeek(); renderSetup(); renderBgNow(); renderBgChecks(); }
+function renderAll(){ renderHero(); renderStrip(); renderRecent(); renderFood(); renderLog(); renderSupplies(); renderSick(); renderItems(); renderGlucose(); renderChecks(); renderBackup(); renderMealPatterns(); renderComing(); renderAppts(); renderDeliveries(); renderReport(); renderFavs(); renderWeek(); renderSetup(); renderBgNow(); renderBgChecks(); renderInsulin(); renderVial(); }
 const dayKey = ms => new Date(ms).toDateString();
 function dayTotals(key){ const es = log.filter(e => dayKey(e.at)===key && (e.type==="food"||e.type==="drink"));
   return { carbs: es.reduce((a,e)=>a+(e.carbs||0),0), ml: es.filter(e=>e.type==="drink").reduce((a,e)=>a+(e.ml||0),0), meals: es.filter(e=>e.type==="food").length, drinks: es.filter(e=>e.type==="drink").length, es }; }
@@ -239,7 +239,7 @@ function renderSick(){
 }
 
 /* ---------- plan form ---------- */
-const PLAN_KEYS = ["name","dob","cgm","pump","hypo","ketAbove","siteDays","sensorDays","eyeMonths","dentalMonths","hypoTx","highTx","signs","glucagon","teamDay","teamOoh","notes"];
+const PLAN_KEYS = ["name","dob","cgm","pump","hypo","ketAbove","siteDays","sensorDays","vialDays","eyeMonths","dentalMonths","hypoTx","highTx","signs","glucagon","teamDay","teamOoh","notes"];
 let planDirty = false;
 function fillPlan(){ if(planDirty) return planUi(); PLAN_KEYS.forEach(k => { const el=$("#p_"+k); if(el) el.value = plan[k] ?? ""; }); planUi(); }
 function planUi(){ const st=$("#planState"); if(st){ st.textContent = planDirty ? "Unsaved changes" : "All saved"; st.classList.toggle("dirty", planDirty); st.parentElement.classList.toggle("dirty", planDirty); }
@@ -1239,6 +1239,53 @@ function renderBgChecks(){
 }
 document.addEventListener("click", ev => { if(ev.target.closest("[data-bglog]")) openEntry("bg"); if(ev.target.closest("[data-bgupload]")){ location.hash="glucose"; setTimeout(()=>$("#gFile")?.click(), 50); } });
 
+
+/* ---------- insulin page (from the pump file) ---------- */
+function rangeEvents(days){ const from=midnight(Date.now())-(days-1)*864e5, out=[]; for(const k of Object.keys(pumpDays)) for(const e of dayPump(k)) if(e.t>=from) out.push(e); return out.sort((a,b)=>b.t-a.t); }
+function renderInsulin(){
+  const st=$("#inStats"); if(!st) return; const days=+($("#inRange")?.value||14), ev=rangeEvents(days);
+  const bol=ev.filter(e=>e.k===2), carbs=ev.filter(e=>e.k===1);
+  const dayKeys=[...Array(days)].map((_,i)=>ymd(midnight(Date.now())-(days-1-i)*864e5));
+  const withData=dayKeys.filter(k=>pumpDays[k]); const nd=Math.max(1,withData.length);
+  if(!bol.length){ st.innerHTML=""; $("#inChart").innerHTML=$("#inTod").innerHTML=""; $("#inList").innerHTML=`<li class="empty">No bolus data in the last ${days} days. Import a full CareLink CSV on the Glucose page and it appears here.</li>`; return; }
+  const tot=bol.reduce((a,e)=>a+e.v,0), ctot=carbs.reduce((a,e)=>a+e.v,0);
+  st.innerHTML = [["Bolus a day",(tot/nd).toFixed(1),"units"],["Boluses a day",(bol.length/nd).toFixed(1),"doses"],["Pump carbs a day",String(Math.round(ctot/nd)),"grams"],["Days with data",String(withData.length),`of ${days}`]]
+    .map(([k,v,n])=>`<div class="wk"><span class="k">${k}</span><b>${v}</b><small>${n}</small></div>`).join("");
+  const per = dayKeys.map(k=>({k, u: dayPump(k).filter(e=>e.k===2).reduce((a,e)=>a+e.v,0), has: !!pumpDays[k]}));
+  const max = Math.max(1,...per.map(d=>d.u));
+  $("#inChart").innerHTML = `<div class="in-bars">${per.map(d=>`<div class="in-bar" title="${new Date(keyToMs(d.k)).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})}: ${d.u.toFixed(1)} U"><span class="in-v">${d.has?d.u.toFixed(1):""}</span><i class="${d.has?"":"none"}" style="height:${d.has?Math.max(3,d.u/max*100):4}%"></i><span class="in-d">${new Date(keyToMs(d.k)).toLocaleDateString("en-GB",{weekday:"narrow"})}</span></div>`).join("")}</div>`;
+  setTimeout(()=>{ const c=$("#inChart"); if(c) c.scrollLeft=c.scrollWidth; }, 0);
+  const slots=[["Night","00–06",0,6],["Morning","06–11",6,11],["Midday","11–15",11,15],["Afternoon","15–18",15,18],["Evening","18–24",18,24]];
+  const sv = slots.map(([n,r,a,b])=>({n,r,u: bol.filter(e=>{const h=new Date(e.t).getHours(); return h>=a&&h<b;}).reduce((x,e)=>x+e.v,0)/nd}));
+  const smax=Math.max(0.1,...sv.map(x=>x.u));
+  $("#inTod").innerHTML = sv.map(x=>`<div class="tod"><span class="tod-n">${x.n}<small>${x.r}</small></span><span class="tod-bar"><i style="width:${x.u/smax*100}%"></i></span><b>${x.u.toFixed(1)} U</b></div>`).join("");
+  $("#inList").innerHTML = bol.slice(0,20).map(e=>{ const c=carbs.find(x=>Math.abs(x.t-e.t)<10*6e4); return `<li><span class="bg-t">${whenText(e.t)}</span><span class="bg-n">${c?`with ${c.v} g carbs`:"correction or no carbs entered"}</span><span class="chip blue num">${e.v.toFixed(2).replace(/0$/,"")} U</span></li>`; }).join("");
+}
+$("#inRange")?.addEventListener("change", renderInsulin);
+
+/* ---------- opened insulin countdown ---------- */
+function renderVial(){
+  const el=$("#vialPanel"); if(!el) return; const v=last("vial"), days=num(plan.vialDays)??28;
+  const btn = `<button type="button" class="primary" data-vialnew>Opened a new one</button>`;
+  if(!v){ el.innerHTML = `<div class="bk-h"><span class="bk-ic" aria-hidden="true">${'<svg class="ic" viewBox="0 0 24 24"><path d="M9 3h6M10 3v3l-4 4v9a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-9l-4-4V3"/><path d="M6 13h12"/></svg>'}</span><div><h2>Insulin in use</h2><p class="muted">Tap when you open a new vial or cartridge. The app counts down its ${days} days.</p></div></div><div class="btns">${btn}</div>`; return; }
+  const due=v.at+days*864e5, left=(due-Date.now())/864e5, frac=Math.max(0,Math.min(1,left/days)), R=40, C=2*Math.PI*R;
+  const cls = left<0 ? "bad" : left<3 ? "warn" : "";
+  el.innerHTML = `<div class="vial ${cls}"><div class="rc-ring" style="width:96px;height:96px"><svg viewBox="0 0 96 96" width="96" height="96" aria-hidden="true"><circle cx="48" cy="48" r="${R}" fill="none" stroke="var(--page-soft)" stroke-width="9"/><circle cx="48" cy="48" r="${R}" fill="none" stroke="${cls==="bad"?"var(--low)":cls==="warn"?"var(--high)":"var(--page)"}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C*(1-frac)).toFixed(1)}" transform="rotate(-90 48 48)"/></svg><div class="rc-in"><b>${left<0?"Out":Math.ceil(left)}</b><span>${left<0?"of date":Math.ceil(left)===1?"day left":"days left"}</span></div></div>
+    <div class="vial-t"><h2>Insulin in use</h2><p>${left<0?`Past its ${days} days. Start a new one.`:`Opened ${new Date(v.at).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})}. Use by ${new Date(due).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})}.`}</p>${v.note?`<p class="muted">${esc(v.note)}</p>`:""}<div class="btns">${btn}</div></div></div>`;
+}
+document.addEventListener("click", ev => { if(ev.target.closest("[data-vialnew]")){ openEntry("vial"); $("#e_note").placeholder = "e.g. NovoRapid cartridge, fridge in kitchen"; } });
+
+/* ---------- night mode at night (this phone) ---------- */
+const NIGHT_KEY = "t1d-night-auto";
+const nightOn = () => { try { return localStorage.getItem(NIGHT_KEY) !== "off"; } catch { return true; } };
+function applyNight(){
+  const h=new Date().getHours(), night = nightOn() && (h>=21 || h<7);
+  if(night) document.documentElement.dataset.theme="dark"; else if(document.documentElement.dataset.theme==="dark") delete document.documentElement.dataset.theme;
+  const cb=$("#nightAuto"); if(cb) cb.checked = nightOn();
+}
+$("#nightAuto")?.addEventListener("change", ev => { try { localStorage.setItem(NIGHT_KEY, ev.target.checked ? "on" : "off"); } catch {} applyNight(); toast(ev.target.checked ? "Night mode on from 9pm to 7am" : "Night mode off"); });
+applyNight(); setInterval(applyNight, 60000); document.addEventListener("visibilitychange", () => { if(!document.hidden) applyNight(); });
+
 /* ---------- weekly summary ---------- */
 function windowStats(fromMs, toMs){
   const pts=[]; for(let t=midnight(fromMs); t<toMs; t+=864e5) pts.push(...dayPoints(ymd(t)).filter(p=>p.t>=fromMs && p.t<toMs));
@@ -1350,7 +1397,7 @@ async function pushOff(){
 /* ===== design v3 helpers ===== */
 const VIEW_TITLES = {glucose:["Glucose","His CGM data, patterns and what they mean"], food:["Food & drink","Meals, drinks and how they affect his glucose"], log:["History","Everything you've logged, and the clinic summary"],
   supplies:["Supplies","Stock at home and the next delivery"], checks:["Growth & check-ups","Height, weight, eyes and teeth"], appts:["Appointments","GP, clinic, vaccinations and more"],
-  reports:["Reports","Round-ups to keep or share"], sick:["Sick day","What to do when he's unwell"], plan:["Care plan","His details, targets and contacts"], backup:["Backup","Keep a copy of everything"], setup:["Setup check","Is everything switched on and working?"]};
+  reports:["Reports","Round-ups to keep or share"], sick:["Sick day","What to do when he's unwell"], plan:["Care plan","His details, targets and contacts"], backup:["Backup","Keep a copy of everything"], setup:["Setup check","Is everything switched on and working?"], insulin:["Insulin","From his pump file: what the pump gave"]};
 for (const [k,[t,sub]] of Object.entries(VIEW_TITLES)) { const sec = document.getElementById("v-"+k); const ic = document.querySelector(`#nav a[href="#${k}"] .ic`); if(!sec || sec.querySelector(".view-head")) continue;
   const h = document.createElement("div"); h.className = "view-head"; h.innerHTML = `<span class="vh-ic">${ic?ic.outerHTML:""}</span><div><h1>${t}</h1><p>${sub}</p></div>`; sec.prepend(h); }
 function labelCardTables(){ document.querySelectorAll("table.cards").forEach(t => { const hs=[...t.querySelectorAll("thead th")].map(th=>th.textContent.trim()); t.querySelectorAll("tbody tr").forEach(tr => [...tr.children].forEach((td,i)=>{ if(hs[i] && !td.hasAttribute("colspan")) td.dataset.label = hs[i]; })); }); }
@@ -1487,6 +1534,7 @@ function renderComing(){
   const site=lastSite(), sensor=last("sensor");
   if(site){ const due=site.at+(num(plan.siteDays)??3)*864e5; add(due, `Site change due${isMedtronic()?" (infusion set + reservoir)":""}`, due<now?"bad":due-now<864e5?"warn":""); }
   if(sensor){ const due=sensor.at+(num(plan.sensorDays)??10)*864e5; add(due, "Sensor change due", due<now?"bad":due-now<864e5?"warn":""); }
+  { const v=last("vial"); if(v){ const due=v.at+(num(plan.vialDays)??28)*864e5; add(due-2*864e5, "Opened insulin: start a new one by "+new Date(due).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"}), due<now?"bad":"warn"); } }
   supplyRows().forEach(sp=>{ if(!sp.days) return; const orderBy=now+Math.max(0,(sp.left-(sp.lead??14)))*864e5; add(orderBy, `Order ${sp.name} (${Math.floor(sp.left)} days left)`, sp.left<=(sp.lead??14)?"bad":"warn"); });
   ["eye","dental"].forEach(k=>{ const d=nextDue(k); if(d!=null && d<=now+30*864e5) items.push({at:d, text:`${CK[k].label} due`, cls:d<now?"bad":""}); });
   { const nd = nextDelivery(); if(nd){ const ob = nd - (num(delivery.lead) ?? 14)*864e5; add(ob, "Order / confirm supplies delivery", ob<now?"bad":"warn"); add(nd, "Supplies delivery due" + (delivery.who?" · "+delivery.who:"")); } }
