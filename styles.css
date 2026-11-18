@@ -1108,6 +1108,23 @@ html[data-view="sites"]{--page:#0E7490;--page-soft:#DDF2F7}
 .rot-hist li:first-child .rh-row{border-top:0}.rh-row:hover{background:var(--surface-2,rgba(0,0,0,.03))}
 .rh-where i{color:var(--high);font-style:normal;font-weight:700}.rh-row small{color:var(--muted)}
 @media (max-width:420px){.rh-row{grid-template-columns:auto 1fr}.rh-row small{grid-column:2}}
+/* back button on every page */
+.ho-rec li.muted{display:block}
+.vh-back{display:inline-flex!important;align-items:center;gap:4px;justify-self:start;align-self:flex-start;width:auto;min-height:36px;padding:6px 14px 6px 8px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:600 .9rem var(--body);box-shadow:0 1px 2px rgb(16 24 40 / .05);margin-bottom:-6px}
+.vh-back svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.vh-back:hover{background:var(--page-soft);border-color:color-mix(in srgb,var(--page) 35%,transparent)}
+/* mobile design pass (7.4) */
+@media (max-width:520px){
+  .log li{grid-template-columns:52px minmax(0,1fr)!important}
+  .log li .row-acts{grid-column:2;flex-direction:row!important;justify-content:flex-start;gap:8px;margin-top:-2px}
+  .log li .row-acts button{min-height:36px;padding:6px 14px}
+  .log li .chip{font-size:.66rem!important;padding:3px 7px!important}
+  .in-bars{gap:4px!important;min-width:0!important}
+  .in-bar{flex:1 1 0!important;min-width:14px!important}
+  .in-v{font-size:10px!important}
+}
+.chip{font-size:max(.68rem,11px)}
+button[data-inc],button[data-dec]{min-width:40px;min-height:40px}
 
 /* ===== sign-in & family setup (family app) ===== */
 #authGate{position:fixed;inset:0;z-index:100;overflow-y:auto;display:flex;flex-direction:column;padding:max(20px,env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-right,0px)) 24px max(14px,env(safe-area-inset-left,0px));

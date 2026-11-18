@@ -55,7 +55,7 @@ declare fid uuid; c text;
 begin
   select family_id into fid from public.family_members where user_id = auth.uid() and role = 'parent' limit 1;
   if fid is null then raise exception 'Only a parent can do this'; end if;
-  c := case when p_on then 'V' || upper(substr(encode(gen_random_bytes(6), 'hex'), 1, 7)) else null end;
+  c := case when p_on then 'V' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 7)) else null end;   -- built-in, works on Supabase
   update public.families set viewer_code = c where id = fid;
   return c;
 end $$;

@@ -26,7 +26,10 @@ function route(){
   $("#moreBtn").classList.toggle("on", secOn); $("#moreSheet").hidden = true; $("#moreBtn").setAttribute("aria-expanded","false");
   scrollTo({top:0}); if(v==="glucose" && typeof renderGlucose==="function") setTimeout(renderGlucose,0); if(v==="reports" && typeof renderReport==="function") setTimeout(renderReport,0);
 }
-addEventListener("hashchange", route); route();
+var navSteps = 0;
+addEventListener("hashchange", () => { navSteps++; route(); });
+function goBack(){ if(navSteps > 0 && history.length > 1){ navSteps = Math.max(0, navSteps-2); history.back(); } else { location.hash = "today"; } }
+route();
 $("#sheetSearch").addEventListener("submit", ev => { ev.preventDefault(); const q=$("#sheetQ").value.trim(); location.hash="log"; setTimeout(()=>{ const i=$("#logSearch"); if(i){ i.value=q; renderLog(); i.focus(); } }, 0); });
 $("#moreBtn").addEventListener("click", () => { const sh=$("#moreSheet"); sh.hidden=!sh.hidden; $("#moreBtn").setAttribute("aria-expanded", String(!sh.hidden)); });
 $("#moreSheet").addEventListener("click", e => { if(e.target.id==="moreSheet") { e.currentTarget.hidden=true; $("#moreBtn").setAttribute("aria-expanded","false"); } });
@@ -1300,7 +1303,7 @@ applyNight(); setInterval(applyNight, 60000); document.addEventListener("visibil
 
 
 /* ---------- version ---------- */
-const APP_VERSION = "7.2";
+const APP_VERSION = "7.4";
 document.querySelectorAll(".ver-n").forEach(e => e.textContent = APP_VERSION);
 { const nav=$("#nav"); if(nav && !nav.querySelector(".app-ver")){ const d=document.createElement("div"); d.className="app-ver nav-ver"; d.textContent="Version "+APP_VERSION; nav.insertBefore(d, $("#moreBtn")); } }
 
@@ -1630,7 +1633,8 @@ const VIEW_TITLES = {glucose:["Glucose","His CGM data, patterns and what they me
   supplies:["Supplies","Stock at home and the next delivery"], checks:["Growth & check-ups","Height, weight, eyes and teeth"], appts:["Appointments","GP, clinic, vaccinations and more"],
   reports:["Reports","Round-ups to keep or share"], sites:["Sites & sensors","Log each change and where it went, so spots get rotated"], handover:["Handover","His sheet for anyone looking after him, and a record of each handover"], sick:["Sick day","What to do when he's unwell"], plan:["Care plan","His details, targets and contacts"], backup:["Backup","Keep a copy of everything"], setup:["Setup check","Is everything switched on and working?"], insulin:["Insulin","From his pump file: what the pump gave"], dayout:["Day out","Plan food, drinks and the bag before you go"]};
 for (const [k,[t,sub]] of Object.entries(VIEW_TITLES)) { const sec = document.getElementById("v-"+k); const ic = document.querySelector(`#nav a[href="#${k}"] .ic`); if(!sec || sec.querySelector(".view-head")) continue;
-  const h = document.createElement("div"); h.className = "view-head"; h.innerHTML = `<span class="vh-ic">${ic?ic.outerHTML:""}</span><div><h1>${t}</h1><p>${sub}</p></div>`; sec.prepend(h); }
+  const h = document.createElement("div"); h.className = "view-head"; h.innerHTML = `<span class="vh-ic">${ic?ic.outerHTML:""}</span><div><h1>${t}</h1><p>${sub}</p></div>`; sec.prepend(h);
+  const bk = document.createElement("button"); bk.type = "button"; bk.className = "vh-back"; bk.setAttribute("aria-label","Back"); bk.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg><span>Back</span>`; bk.addEventListener("click", goBack); sec.prepend(bk); }
 function labelCardTables(){ document.querySelectorAll("table.cards").forEach(t => { const hs=[...t.querySelectorAll("thead th")].map(th=>th.textContent.trim()); t.querySelectorAll("tbody tr").forEach(tr => [...tr.children].forEach((td,i)=>{ if(hs[i] && !td.hasAttribute("colspan")) td.dataset.label = hs[i]; })); }); }
 new MutationObserver(() => labelCardTables()).observe(document.querySelector(".wrap"), {childList:true, subtree:true});
 function friendlyLine(){
