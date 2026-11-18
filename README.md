@@ -51,3 +51,18 @@ Upload the changed files the same way. Phones get the new version next time the 
 6. Also replace `.github/workflows/daily-backup.yml` with the new `daily-backup.yml`. It now tells the app when the off-site backup worked, so Setup check can show it.
 
 iPhone: notifications only work when the app has been added to the Home Screen (Safari → Share → Add to Home Screen) and is opened from there.
+
+## Version 6: instant alerts when the app is closed (15 minutes)
+Buzzes the other parents' phones the moment someone logs a hypo or starts sick-day mode.
+
+Before you start: notifications must be switched on in the app on each phone (**Setup check → Turn on notifications**), and you need the **private key** the app showed you then. If you've lost it, turn notifications off and on again in the app to make a new pair, and update the GitHub secret too.
+
+1. Supabase → **Edge Functions → Deploy a new function → Via Editor**. Start from scratch, name it `parent-alert`, delete any example code, paste the whole of `parent-alert.ts`, and click **Deploy function**.
+2. Open the function's **Details** tab and switch **JWT verification off**, then save. The function checks its own secret instead.
+3. **Edge Functions → Secrets** (or Project Settings → Edge Functions): add
+   - `VAPID_PRIVATE_KEY` = the private key from the app
+   - `ALERT_SECRET` = any long random text you make up (e.g. 30 letters and numbers)
+4. Open `alerts-setup.sql`, change the two lines marked **EDIT** (your Project URL, and the same ALERT_SECRET text), then paste it into **SQL Editor** and **Run**.
+5. Test: on your phone, close the app. On the other phone, open **He's low** and log a hypo. Your phone should buzz within a few seconds. Delete the test entry afterwards.
+
+If nothing arrives: Edge Functions → parent-alert → **Logs** shows why (e.g. "notifications not turned on in the app" or a missing secret).

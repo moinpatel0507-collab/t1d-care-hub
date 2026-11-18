@@ -86,6 +86,7 @@ img{max-width:100%}
     <a href="#sick" id="sickBanner" class="sick-banner" hidden></a>
     <button type="button" class="hypo-go" id="hypoGo"><span class="hg-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15M6 13l6 6 6-6"/></svg></span><span><b>He's low</b><small>Treatment steps and a 15-minute recheck</small></span></button>
     <section class="panel bgnow" id="bgNow" aria-label="Latest glucose"></section>
+    <div class="nudge" id="importNudge" role="status" hidden></div>
     <div class="today-top"><section class="rings" id="rings" aria-label="Infusion set and sensor"></section></div>
     <div class="strip" id="strip"></div>
     <div class="panel" id="comingPanel">
@@ -295,6 +296,7 @@ img{max-width:100%}
   <!-- APPOINTMENTS -->
   <section id="v-appts" class="view" hidden>
     <div class="strip" id="aStrip"></div>
+    <div class="panel" id="todoPanel"></div>
     <div class="panel">
       <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end">
         <div><h2>Upcoming</h2><div class="muted">GP, diabetes clinic, vaccinations, hospital, dentist and more. Add questions to ask before you go.</div></div>
@@ -403,6 +405,13 @@ img{max-width:100%}
         <label>Diabetes team, daytime<span class="tel-row"><input id="p_teamDay" type="tel" inputmode="tel" placeholder="Phone number"><a class="btn call" data-call="p_teamDay" hidden>Call</a></span></label>
         <label>Diabetes team, out of hours<span class="tel-row"><input id="p_teamOoh" type="tel" inputmode="tel" placeholder="Phone number"><a class="btn call" data-call="p_teamOoh" hidden>Call</a></span></label>
       </section>
+      <section class="panel pl-sec pl-handover">
+        <div class="pl-h"><span class="pl-ic c-teal"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v18H7z"/><path d="M10 7h4M10 11h4M10 15h2"/></svg></span><div><h2>Nursery or childminder</h2><p>Extra details for the one-page handover sheet</p></div></div>
+        <label>Who to call first <small>names and mobile numbers, in order</small><textarea id="p_hoContacts" placeholder="e.g. Mum 07700 900123, Dad 07700 900456"></textarea></label>
+        <label>Where his hypo kit is <small>at the nursery or carer's home</small><input id="p_hoKit" placeholder="e.g. red bag in the office, labelled with his name"></label>
+        <label>Pump and sensor: what carers should know<textarea id="p_hoPump" placeholder="e.g. Don't remove the pump or sensor. If it beeps or falls off, call us. Don't give insulin."></textarea></label>
+        <div class="btns"><button type="button" class="primary" id="hoPreview">Handover sheet</button><span class="muted" style="align-self:center;font-size:.85rem">Save the care plan first so the sheet uses the latest details.</span></div>
+      </section>
       <section class="panel pl-sec">
         <div class="pl-h"><span class="pl-ic c-grey"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/></svg></span><div><h2>Notes for the two of you</h2><p>Anything else worth remembering</p></div></div>
         <label class="sr-label"><span class="sr-only">Notes</span><textarea id="p_notes" placeholder="e.g. nursery keeps his hypo kit in the office"></textarea></label>
@@ -434,6 +443,7 @@ img{max-width:100%}
       <div class="ph"><h2>Pack the bag</h2><span class="muted" id="doPackCount"></span></div>
       <ul class="do-pack" id="doPack"></ul>
     </div>
+    <div class="panel" id="tripPanel"></div>
   </section>
 
   <!-- INSULIN -->
@@ -456,6 +466,7 @@ img{max-width:100%}
       <ul class="bg-list" id="inList"></ul>
       <p class="bk-note">Shows what happened, not what to give. Talk to his diabetes team before changing any pump setting.</p>
     </div>
+    <div class="panel" id="setPanel"></div>
   </section>
 
   <!-- SETUP CHECK -->
@@ -649,6 +660,25 @@ img{max-width:100%}
   </form>
 </dialog>
 <div id="parentAlert" class="parent-alert" role="alert" hidden></div>
+<dialog id="hoDlg" class="ho-dlg">
+  <div class="ho-top"><h2>Handover sheet</h2><div class="btns"><button type="button" class="primary small" id="hoPdf">Download PDF</button><button type="button" class="small" id="hoClose">Close</button></div></div>
+  <p class="muted" id="hoMsg" style="margin:0;font-size:.85rem">Print it, or send the PDF. Give a copy to everyone who looks after him.</p>
+  <div class="rep-scroll"><div id="hoView" class="report-paper ho-paper"></div></div>
+</dialog>
+<dialog id="setDlg">
+  <form id="setForm" method="dialog">
+    <h2>Log a pump setting change</h2>
+    <div class="grid2">
+      <label>Date it changed<input id="st_date" type="date" required></label>
+      <label>What changed<select id="st_kind"><option value="ratio">Carb ratio</option><option value="ait">Active insulin time</option><option value="target">Target (SmartGuard)</option><option value="basal">Basal pattern</option><option value="isf">Correction / sensitivity</option><option value="other">Other</option></select></label>
+      <label>From <small>optional</small><input id="st_from" placeholder="e.g. 1:15" autocomplete="off"></label>
+      <label>To <small>optional</small><input id="st_to" placeholder="e.g. 1:12" autocomplete="off"></label>
+      <label>Who changed it <small>optional</small><input id="st_who" placeholder="e.g. diabetes nurse on the phone" autocomplete="off"></label>
+      <label>Note <small>optional</small><input id="st_note" placeholder="e.g. breakfast only" autocomplete="off"></label>
+    </div>
+    <div class="btns" style="justify-content:flex-end"><button type="button" id="setCancel">Cancel</button><button class="primary" type="submit">Save</button></div>
+  </form>
+</dialog>
 <dialog id="supDlg">
   <form id="supForm" method="dialog">
     <h2>Supply item</h2>

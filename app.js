@@ -240,7 +240,7 @@ function renderSick(){
 }
 
 /* ---------- plan form ---------- */
-const PLAN_KEYS = ["name","dob","cgm","pump","hypo","ketAbove","siteDays","sensorDays","vialDays","eyeMonths","dentalMonths","hypoTx","highTx","signs","glucagon","teamDay","teamOoh","notes"];
+const PLAN_KEYS = ["name","dob","cgm","pump","hypo","ketAbove","siteDays","sensorDays","vialDays","eyeMonths","dentalMonths","hypoTx","highTx","signs","glucagon","teamDay","teamOoh","notes","hoContacts","hoKit","hoPump"];
 let planDirty = false;
 function fillPlan(){ if(planDirty) return planUi(); PLAN_KEYS.forEach(k => { const el=$("#p_"+k); if(el) el.value = plan[k] ?? ""; }); planUi(); }
 function planUi(){ const st=$("#planState"); if(st){ st.textContent = planDirty ? "Unsaved changes" : "All saved"; st.classList.toggle("dirty", planDirty); st.parentElement.classList.toggle("dirty", planDirty); }
@@ -859,7 +859,7 @@ function cgmStats(days){
 }
 
 /* ---- render ---- */
-function renderGlucose(){ setTimeout(()=>{ renderBgNow(); renderBgChecks(); hypoState(); renderWatch(); if(typeof renderA1c==="function"){ renderA1c(); renderActs(); } }, 0);
+function renderGlucose(){ setTimeout(()=>{ renderBgNow(); renderBgChecks(); hypoState(); renderWatch(); if(typeof renderA1c==="function"){ renderA1c(); renderActs(); } if(typeof renderNudge==="function"){ renderNudge(); renderSettings(); } }, 0);
   const keys = Object.keys(cgmDays).sort();
   const days = +$("#gRange").value;
   const st = cgmStats(days);
@@ -1295,7 +1295,7 @@ applyNight(); setInterval(applyNight, 60000); document.addEventListener("visibil
 
 
 /* ---------- version ---------- */
-const APP_VERSION = "5.0";
+const APP_VERSION = "6.1";
 document.querySelectorAll(".ver-n").forEach(e => e.textContent = APP_VERSION);
 { const nav=$("#nav"); if(nav && !nav.querySelector(".app-ver")){ const d=document.createElement("div"); d.className="app-ver nav-ver"; d.textContent="Version "+APP_VERSION; nav.insertBefore(d, $("#moreBtn")); } }
 
@@ -1721,32 +1721,31 @@ function buildReport(){
 function renderReport(){ const el=$("#reportView"); if(!el || $("#v-reports").hidden) return; el.innerHTML = rpBuild(); }
 ["#rpPeriod","#rpFrom","#rpTo"].forEach(id => $(id).addEventListener("change", renderReport));
 function loadScript(src){ return new Promise((res, rej) => { if(document.querySelector(`script[src="${src}"]`)) return res(); const sc=document.createElement("script"); sc.src=src; sc.onload=res; sc.onerror=()=>rej(new Error("load")); document.head.appendChild(sc); }); }
-$("#rpPdf").addEventListener("click", async e => {
-  const btn=e.currentTarget, msg=$("#rpMsg"); btn.disabled=true; msg.textContent="Making the PDF…";
-  try {
+async function htmlToPdf(html, filename){
     await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
     await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
     const holder=document.createElement("div"); holder.style.cssText="position:fixed;left:-10000px;top:0;width:794px;background:#fff";
-    holder.innerHTML=`<div class="report-paper print">${rpBuild()}</div>`; document.body.appendChild(holder);
+    holder.innerHTML=html; document.body.appendChild(holder);
     await new Promise(r=>setTimeout(r,60));
-    { // keep sections whole: push anything that would be cut by a page break onto the next page
-      const paper = holder.firstChild, pageH = Math.floor(794 * 842 / 595); let changed = true, guard = 0;
+    { const paper = holder.firstChild, pageH = Math.floor(794 * 842 / 595); let changed = true, guard = 0;
       while(changed && guard++ < 40){ changed = false; const top0 = paper.getBoundingClientRect().top;
         for(const el of [...paper.children]){ if(el.classList.contains("rp-gap")) continue; const r = el.getBoundingClientRect(), t = r.top-top0, bt = r.bottom-top0;
           const pageEnd = (Math.floor(t/pageH)+1)*pageH; const isHead = el.tagName==="H2";
-          if((bt > pageEnd && r.height < pageH*0.9) || (isHead && t + 140 > pageEnd)){ const gap=document.createElement("div"); gap.className="rp-gap"; gap.style.height=(pageEnd - t + 24)+"px"; paper.insertBefore(gap, el); changed = true; break; } } }
-    }
+          if((bt > pageEnd && r.height < pageH*0.9) || (isHead && t + 140 > pageEnd)){ const gap=document.createElement("div"); gap.className="rp-gap"; gap.style.height=(pageEnd - t + 24)+"px"; paper.insertBefore(gap, el); changed = true; break; } } } }
     const canvas = await window.html2canvas(holder.firstChild, {scale:2, backgroundColor:"#ffffff", useCORS:true, logging:false});
     holder.remove();
     const { jsPDF } = window.jspdf; const pdf = new jsPDF({unit:"pt", format:"a4"}); const pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight();
-    const imgH = canvas.height * pw / canvas.width; let y=0, page=0;
-    const sliceH = Math.floor(canvas.width * ph / pw);
+    let y=0, page=0; const sliceH = Math.floor(canvas.width * ph / pw);
     while(y < canvas.height){ const c=document.createElement("canvas"); c.width=canvas.width; c.height=Math.min(sliceH, canvas.height-y);
       c.getContext("2d").drawImage(canvas, 0, y, canvas.width, c.height, 0, 0, canvas.width, c.height);
       if(page++) pdf.addPage(); pdf.addImage(c.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, pw, c.height*pw/canvas.width); y += sliceH; }
-    const blob = pdf.output("blob"); const [a] = rpRange();
+    const blob = pdf.output("blob");
     const d = await getDownloads(); if(!d) throw Object.assign(new Error("Saving files isn't available here"),{code:"unavailable"});
-    const r = await d.save({filename:`T1D-${$("#rpFor").value==="team"?"clinic-pack":"report"}-${ymd(a)}.pdf`, data: blob}); msg.textContent = r.status==="saved" ? "PDF saved." : "";
+    return d.save({filename, data: blob});
+}
+$("#rpPdf").addEventListener("click", async e => {
+  const btn=e.currentTarget, msg=$("#rpMsg"); btn.disabled=true; msg.textContent="Making the PDF…";
+  try { { const [a]=rpRange(); const r = await htmlToPdf(`<div class="report-paper print">${rpBuild()}</div>`, `T1D-${$("#rpFor").value==="team"?"clinic-pack":"report"}-${ymd(a)}.pdf`); msg.textContent = r.status==="saved" ? "PDF saved." : ""; }
   } catch(err){ msg.textContent = err.code==="declined" ? "Cancelled." : err.message==="load" ? "Couldn't load the PDF maker. Check your internet connection." : (err.message || "Couldn't make the PDF."); }
   finally { btn.disabled=false; }
 });
@@ -1766,6 +1765,8 @@ function renderComing(){
   { const nd = nextDelivery(); if(nd){ const ob = nd - (num(delivery.lead) ?? 14)*864e5; add(ob, "Order / confirm supplies delivery", ob<now?"bad":"warn"); add(nd, "Supplies delivery due" + (delivery.who?" · "+delivery.who:"")); } }
   if(typeof dayplans!=="undefined") Object.values(dayplans).forEach(pl=>{ const t=keyToMs(pl.date)+hm2min(pl.leave)*6e4; if(t>=midnight(now)) add(t, `Day out${pl.where?": "+pl.where:""} (${pl.items.length} food/drink planned)`, ""); });
   appts.filter(a=>a.status==="booked" && a.at>=midnight(now) && a.at<=horizon).forEach(a=>items.push({at:a.at, text:`${(AK[a.kind]||AK.other).label}${a.vaccine?" ("+a.vaccine+")":""}${a.hasTime?" at "+new Date(a.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):""}${a.where?" · "+a.where:""}`, cls:""}));
+  if(typeof todos!=="undefined" && todos) todos.filter(t=>!t.done && t.due).forEach(t=>add(t.due, "To do: "+t.text, t.due<midnight(now)?"bad":""));
+  if(typeof trips!=="undefined" && trips) Object.values(trips).forEach(t=>{ if(!t.from) return; const st=keyToMs(t.from); if(st>=midnight(now) && st<=now+7*864e5){ const it=tripItems(t), n=it.filter(([k])=>(t.packed||{})[k]).length; add(st, `Going away${t.where?": "+t.where:""} (${n} of ${it.length} packed)`, n<it.length && st-now<2*864e5?"warn":""); } });
   if(typeof rxDue==="function"){ const rd=rxDue(); if(rd && rd<=now+5*864e5) items.push({at:rd, text:"Order his repeat prescription"+(rx.note?" · "+rx.note:""), cls: rd<now?"bad":"warn"}); }
   if(log.length>20 && (!lastBackup || now-lastBackup>30*864e5)) items.push({at:now, text:"Download a backup (Backup tab)", cls:"warn"});
   items.sort((a,b)=>a.at-b.at);
@@ -1946,7 +1947,7 @@ document.addEventListener("click", async ev => {
 
 
 /* ================= BACKUP ================= */
-const BK_COLS = ["log","cgm","pump","growth","checks","supplies","appts","foods","photos","dayplans","hba1c","rx"];
+const BK_COLS = ["log","cgm","pump","growth","checks","supplies","appts","foods","photos","dayplans","hba1c","rx","settings","todos","trips"];
 let lastBackup = null, dl = null, fileBackupAt = null;
 function bkStatus(m){ const n=$("#bkStatus"); n.hidden=!m; n.textContent=m||""; }
 function renderBackup(){
@@ -2214,6 +2215,155 @@ function paCheck(){
     if(!canWrite) return; if(go==="hypo") openHypo(); else { location.hash = go==="food" ? "food" : "glucose"; setTimeout(()=>openEntry(go), 80); } }, 100); })();
 renderRx();
 
+/* ================= Nursery / childminder handover sheet ================= */
+function ageOf(dob){ if(!dob) return ""; const d=new Date(dob), n=new Date(); let m=(n.getFullYear()-d.getFullYear())*12+n.getMonth()-d.getMonth(); if(n.getDate()<d.getDate()) m--; if(m<0) return ""; return m<24 ? `${m} months` : `${Math.floor(m/12)} years${m%12?` ${m%12} months`:""}`; }
+function buildHandover(){
+  const name = P("name") || "Our son", lo = hypoBelow(), ket = ketAbove();
+  const v = (k, fb) => P(k) ? esc(P(k)).replace(/\n/g,"<br>") : `<span class="ho-blank">${fb}</span>`;
+  const tel = k => P(k) ? `<b>${esc(P(k))}</b>` : `<span class="ho-blank">ask his parents</span>`;
+  const snacks = (typeof favSort==="function" ? favSort() : []).filter(f=>f.kind!=="drink" || f.carbs).slice(0,10);
+  const age = ageOf(P("dob"));
+  return `<div class="ho-head"><div><div class="rp-eyebrow">Type 1 diabetes · handover for nursery or childminder</div><h1>${esc(name)}</h1>
+      <div class="rp-sub">${[age, P("dob")?"born "+new Date(P("dob")).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"}):"", P("pump")?esc(P("pump"))+" insulin pump":"", P("cgm")?esc(P("cgm"))+" sensor":""].filter(Boolean).join(" · ")}</div></div>
+      <div class="ho-999"><b>999</b><span>if he is unconscious, fitting or can't swallow</span></div></div>
+  <div class="ho-box ho-low"><h2>If he is low: below ${lo} mmol/L, or he seems unwell</h2>
+    <div class="ho-cols"><div><h3>Signs to look for</h3><p>${v("signs","e.g. grizzly, pale, sweaty, clingy, unusually quiet")}</p><p class="ho-small">He is too young to tell you. If in doubt, check his glucose.</p></div>
+    <div><h3>What to do</h3><p>${v("hypoTx","Give fast sugar as his parents showed you, then recheck in 15 minutes")}</p><p class="ho-small">Stay with him. Recheck after 15 minutes and repeat if still below ${lo}. Then call us.</p></div></div>
+    <div class="ho-em"><b>Emergency:</b> if he is unconscious, fitting or can't swallow, give <b>nothing</b> by mouth. Put him in the recovery position and <b>call 999</b>, then call us.${P("glucagon")?` Glucagon: ${esc(P("glucagon").trim().replace(/\.+$/,""))}.`:""}</div></div>
+  <div class="ho-cols ho-two">
+    <div class="ho-box"><h2>If he is high</h2><p>${v("highTx",`Above ${ket} mmol/L: call his parents. Give water to drink.`)}</p><p class="ho-small">Call us straight away if he is high and vomiting, drowsy or breathing fast.</p></div>
+    <div class="ho-box"><h2>Pump and sensor</h2><p>${v("hoPump","Don't remove the pump or sensor. If it alarms or comes off, call us. Don't give insulin.")}</p></div>
+  </div>
+  <div class="ho-cols ho-two">
+    <div class="ho-box"><h2>Who to call</h2><p>${v("hoContacts","Parents' names and numbers")}</p>
+      <p class="ho-small">Diabetes team (day): ${tel("teamDay")}<br>Out of hours: ${tel("teamOoh")}</p></div>
+    <div class="ho-box"><h2>Hypo kit</h2><p>${v("hoKit","Where his hypo kit is kept")}</p><p class="ho-small">It should go with him everywhere: trips, the garden, nap room.</p></div>
+  </div>
+  ${snacks.length?`<div class="ho-box"><h2>His usual food and carbs</h2><p class="ho-small" style="margin-top:0">Write down what he eats and roughly how much, so we can count it.</p><table class="rp-table"><tbody>${snacks.map(f=>`<tr><td>${esc(f.name)}</td><td>${f.portion?esc(f.portion):""}</td><td style="text-align:right"><b>${f.carbs} g</b> carbs</td></tr>`).join("")}</tbody></table></div>`:""}
+  <div class="rp-foot">Prepared by his parents on ${new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}. This sheet is a quick guide; if it differs from his healthcare plan from the diabetes team, follow that plan.</div>`;
+}
+$("#hoPreview").addEventListener("click", () => { $("#hoView").innerHTML = buildHandover(); $("#hoMsg").textContent = "Print it, or send the PDF. Give a copy to everyone who looks after him."; $("#hoDlg").showModal(); });
+$("#hoClose").addEventListener("click", () => $("#hoDlg").close());
+$("#hoPdf").addEventListener("click", async e => { const btn=e.currentTarget, msg=$("#hoMsg"); btn.disabled=true; msg.textContent="Making the PDF…";
+  try { const r = await htmlToPdf(`<div class="report-paper print ho-paper">${buildHandover()}</div>`, `Handover-sheet-${(P("name")||"T1D").replace(/[^\w-]+/g,"-")}.pdf`); msg.textContent = r.status==="saved" ? "PDF saved." : ""; }
+  catch(err){ msg.textContent = err.code==="declined" ? "Cancelled." : err.message==="load" ? "Couldn't load the PDF maker. Check your internet connection." : (err.message || "Couldn't make the PDF."); }
+  finally { btn.disabled=false; } });
+
+/* ================= v6.0 ================= */
+/* --- CGM import nudge (Today) --- */
+function lastCgmDay(){ const ks=Object.keys(cgmDays||{}).sort(); return ks.length ? ks[ks.length-1] : null; }
+function renderNudge(){
+  const el=$("#importNudge"); if(!el) return; let snooze=0; try { snooze=+localStorage.getItem("t1d-nudge-snooze")||0; } catch {}
+  const k=lastCgmDay(), now=Date.now(); let msg=null;
+  if(k){ const age=Math.floor((midnight(now)-keyToMs(k))/864e5); if(age>=7) msg=`<b>His glucose data stops ${age} days ago</b><span>Import his latest CareLink file so the graphs, watch times and reports stay right.</span>`; }
+  else if(log.length>=10 && log.some(e=>e.at<now-7*864e5)) msg=`<b>No CGM file imported yet</b><span>Import his CareLink file to see his graphs, watch times and reports.</span>`;
+  el.hidden = !msg || snooze>now; if(el.hidden) return;
+  el.innerHTML = `<div>${msg}</div><div class="btns"><button type="button" class="small primary" id="nudgeGo">Import now</button><button type="button" class="small" id="nudgeLater">Not now</button></div>`;
+  $("#nudgeGo").onclick = () => { location.hash="glucose"; };
+  $("#nudgeLater").onclick = () => { try { localStorage.setItem("t1d-nudge-snooze", String(now+3*864e5)); } catch {} el.hidden=true; };
+}
+
+/* --- Pump settings history (Insulin) --- */
+var setChanges = [];
+const SET_KINDS = {ratio:"Carb ratio", ait:"Active insulin time", target:"Target (SmartGuard)", basal:"Basal pattern", isf:"Correction / sensitivity", other:"Other"};
+function setEffect(c, nextAt){
+  const end = Math.min(Date.now(), nextAt ?? Infinity, c.at+14*864e5);
+  const bp=ptsBetween(c.at-14*864e5, c.at-1), ap=ptsBetween(c.at, end);
+  const bd=new Set(bp.map(p=>ymd(p.t))).size, ad=new Set(ap.map(p=>ymd(p.t))).size;
+  return {b: bd>=5 ? statsOf(bp) : null, a: ad>=5 ? statsOf(ap) : null, bd, ad, eb:hypoEpisodes(bp).length, ea:hypoEpisodes(ap).length};
+}
+function renderSettings(){
+  const el=$("#setPanel"); if(!el) return; const rows=[...setChanges].sort((x,y)=>y.at-x.at);
+  const fx = (r,i) => { const e=setEffect(r, i>0 ? rows[i-1].at : null);
+    if(!e.a) return `<div class="set-fx muted">${e.ad<5 && r.at>Date.now()-5*864e5 ? "Too soon to tell. Check back after 5 days of CGM data." : "Needs CGM data after the change to compare."}</div>`;
+    if(!e.b) return `<div class="set-fx muted">No CGM data from before the change to compare with.</div>`;
+    const d=Math.round(e.a.tir-e.b.tir), lo=e.a.below-e.b.below;
+    return `<div class="set-fx"><span>In range <b>${Math.round(e.b.tir)}% → ${Math.round(e.a.tir)}%</b> <i class="${d>=3?"up":d<=-3?"down":""}">${d>0?"+":""}${d}</i></span><span>Low <b>${e.b.below.toFixed(1)}% → ${e.a.below.toFixed(1)}%</b> <i class="${lo<=-0.5?"up":lo>=0.5?"down":""}">${lo>0?"+":""}${lo.toFixed(1)}</i></span><span>Average <b>${e.b.mean.toFixed(1)} → ${e.a.mean.toFixed(1)}</b></span></div>`; };
+  el.innerHTML = `<div class="ph"><h2>Pump setting changes</h2><button type="button" class="small primary" id="setAdd">Log a change</button></div>
+    <div class="muted" style="font-size:.9rem">Each time his team changes a setting, log it here. The app compares his CGM in the 2 weeks before and after, so you can see if it helped.</div>
+    ${rows.length ? `<ul class="set-list">${rows.map((r,i)=>`<li><div class="set-top"><div><b>${esc(SET_KINDS[r.kind]||r.kind)}</b>${r.from||r.to?` <span class="set-ch">${esc(r.from||"?")} → ${esc(r.to||"?")}</span>`:""}<div class="muted" style="font-size:.85rem">${fmtD(r.at)}${r.who?" · "+esc(r.who):""}${r.note?" · "+esc(r.note):""}</div></div><button type="button" class="small" data-setdel="${esc(r.id)}" aria-label="Delete">✕</button></div>${fx(r,i)}</li>`).join("")}</ul>`
+      : `<p class="muted" style="margin:0">No changes logged yet.</p>`}
+    <p class="bk-note">This shows what happened after each change, not why. Lots of things move his glucose: growing, illness, teething, activity.</p>`;
+  $("#setAdd").onclick = () => { if(!canWrite) return toast("Saving isn't switched on here"); $("#setForm").reset(); $("#st_date").value=ymd(Date.now()); $("#setDlg").showModal(); };
+  el.querySelectorAll("[data-setdel]").forEach(b => b.onclick = () => deleteWithUndo("settings", b.dataset.setdel, "Change"));
+}
+$("#setForm").addEventListener("submit", async ev => { ev.preventDefault();
+  try { await base.collection("settings").add({at: dateMs($("#st_date").value), kind: $("#st_kind").value, from: $("#st_from").value.trim(), to: $("#st_to").value.trim(), who: $("#st_who").value.trim(), note: $("#st_note").value.trim(), by: me}); $("#setDlg").close(); toast("Change logged"); } catch { toast("Couldn't save"); } });
+$("#setCancel").addEventListener("click", () => $("#setDlg").close());
+
+/* --- Clinic follow-up to-dos (Appointments) --- */
+var todos = [];
+function renderTodos(){
+  const el=$("#todoPanel"); if(!el) return;
+  const open=todos.filter(t=>!t.done).sort((a,b)=>(a.due??9e15)-(b.due??9e15) || a.at-b.at), done=todos.filter(t=>t.done).sort((a,b)=>(b.doneAt||0)-(a.doneAt||0)).slice(0,5);
+  const li = t => `<li class="${t.done?"done":""}"><label class="do-chk"><input type="checkbox" data-todo="${esc(t.id)}" ${t.done?"checked":""}><span><b>${esc(t.text)}</b>${t.due&&!t.done?`<small class="${t.due<midnight(Date.now())?"late":""}">${dayLabel(t.due)}</small>`:""}</span></label><button type="button" class="small" data-tododel="${esc(t.id)}" aria-label="Delete">✕</button></li>`;
+  el.innerHTML = `<div class="ph"><h2>After clinic: to do</h2><span class="muted">${open.length} open</span></div>
+    <div class="muted" style="font-size:.9rem">What the team asked you to do or try. Ones with a date show in Coming days.</div>
+    <form class="todo-add" id="todoForm"><input id="td_text" placeholder="e.g. Book bloods, try new ratio at breakfast" required autocomplete="off"><input id="td_due" type="date" aria-label="Do by (optional)"><button class="primary small" type="submit">Add</button></form>
+    ${open.length?`<ul class="todo-list">${open.map(li).join("")}</ul>`:`<p class="muted" style="margin:0">Nothing open.</p>`}
+    ${done.length?`<details><summary class="muted" style="cursor:pointer">Done recently (${done.length})</summary><ul class="todo-list">${done.map(li).join("")}</ul></details>`:""}`;
+  $("#todoForm").onsubmit = async ev => { ev.preventDefault(); if(!canWrite) return toast("Saving isn't switched on here"); const t=$("#td_text").value.trim(); if(!t) return; const d=$("#td_due").value;
+    try { await base.collection("todos").add({text:t, due: d?dateMs(d):null, done:false, at:Date.now(), by:me}); } catch { toast("Couldn't save"); } };
+  el.querySelectorAll("[data-todo]").forEach(c => c.onchange = async () => { const t=todos.find(x=>x.id===c.dataset.todo); if(!t) return; const {id, ...body}=t;
+    try { await base.collection("todos").doc(id).set({...body, done:c.checked, doneAt:c.checked?Date.now():null}); } catch { toast("Couldn't save"); } });
+  el.querySelectorAll("[data-tododel]").forEach(b => b.onclick = () => deleteWithUndo("todos", b.dataset.tododel, "To-do"));
+}
+
+/* --- Holiday packing planner (Day out) --- */
+var trips = {}, tripCur = null, tripTimer = null;
+const nightsOf = t => t.from && t.to ? Math.max(1, Math.round((keyToMs(t.to)-keyToMs(t.from))/864e5)) : 0;
+function tripDefault(){ const up=Object.values(trips).filter(t=>t.to>=ymd(Date.now())).sort((a,b)=>a.from<b.from?-1:1)[0]; return up ? up.id : (Object.keys(trips)[0] || null); }
+function tripItems(t){
+  const n=nightsOf(t), days=n+1, out=[];
+  supplyRows().filter(s=>s.days).forEach(s=>{ const need=Math.max(1,Math.ceil(days/s.days))*2; out.push(["sup:"+s.id, `${s.name}: ${need}`, `Double what he'll use${s.qty!=null&&s.qty<need?`. You have ${s.qty} at home: order more`:""}`]); });
+  const vd=num(P("vialDays"))??28, vi=Math.max(1,Math.ceil(days/vd))*2;
+  out.push(["insulin", `Insulin for the pump: ${vi} vials/cartridges`, "Keep it cool (cool bag or Frio pouch), never in the hold"]);
+  out.push(["pens", "Back-up insulin pens, needles and long-acting insulin", "In case the pump fails. Only as his team has told you"]);
+  out.push(["hypo", `Hypo treatment: at least ${days*3} goes`, (P("hypoTx")||"What his team told you to give").split("\n")[0].slice(0,90)]);
+  out.push(["glucagon","Glucagon", P("glucagon")||"Check it's in date"]);
+  out.push(["meter","BG meter, strips, finger pricker and ketone strips","Plus spare meter batteries"]);
+  out.push(["batt","Spare AA batteries for the pump",""]);
+  out.push(["charger","Sensor transmitter charger and phone charger", t.abroad?"And a plug adapter":""]);
+  out.push(["plan","Printed care plan and handover sheet","Care plan → Handover sheet"]);
+  out.push(["rx","Copy of his prescription and the diabetes team's numbers", P("teamOoh")?"Out of hours: "+P("teamOoh"):""]);
+  if(t.flying){ out.push(["letter","Travel letter from his diabetes team","Ask a few weeks before. Shows security why you carry needles and liquids"]);
+    out.push(["hand","All diabetes supplies in hand luggage","Split between two bags in case one goes missing"]);
+    out.push(["scan","Check Medtronic's airport advice for the pump and sensor","Ask security for a hand search instead of the body scanner if advised"]); }
+  if(t.abroad){ out.push(["ins","Travel insurance that covers his diabetes","Declare it, or claims can be refused"]); out.push(["ghic","GHIC card (if going to Europe)","Free on the NHS website, one for each of you"]); out.push(["loan","Ask Medtronic about a spare pump for the trip","Ask well before you go"]); }
+  if(Math.abs(num(t.tz)||0)>=2) out.push(["tz",`Time difference ${t.tz>0?"+":""}${t.tz} h: ask his team how to change the pump clock`, "Changing it changes when his basal is given"]);
+  return out;
+}
+function tripSave(t){ trips[t.id]=t; clearTimeout(tripTimer); tripTimer=setTimeout(async()=>{ try { await base.collection("trips").doc(t.id).set(t); } catch { toast("Couldn't save the trip"); } }, 500); }
+function renderTrip(){
+  const el=$("#tripPanel"); if(!el) return; if(!tripCur || !trips[tripCur]) tripCur = tripDefault(); const t = tripCur ? trips[tripCur] : null;
+  const list = Object.values(trips).sort((a,b)=>a.from<b.from?1:-1);
+  if(!t){ el.innerHTML = `<div class="ph"><h2>Going away</h2><button type="button" class="small primary" id="tripNew">Plan a trip</button></div><div class="muted" style="font-size:.9rem">A packing list for nights away: supplies worked out from his stock, insulin, documents, and extra checks if you're flying or going abroad.</div>`; $("#tripNew").onclick = tripNew; return; }
+  const items=tripItems(t), packed=t.packed||{}, n=items.filter(([k])=>packed[k]).length, nights=nightsOf(t);
+  el.innerHTML = `<div class="ph"><h2>Going away</h2><div class="btns" style="margin:0">${list.length>1?`<select id="tr_pick" aria-label="Trip">${list.map(x=>`<option value="${esc(x.id)}" ${x.id===t.id?"selected":""}>${esc(x.where||"Trip")} · ${x.from?new Date(keyToMs(x.from)).toLocaleDateString("en-GB",{day:"numeric",month:"short"}):""}</option>`).join("")}</select>`:""}<button type="button" class="small" id="tripNew">New trip</button></div></div>
+    <div class="grid2">
+      <label>Where<input id="tr_where" value="${esc(t.where||"")}" placeholder="e.g. Grandma's in Leeds, Spain" autocomplete="off"></label>
+      <label>Time difference <small>hours, if any</small><input id="tr_tz" type="number" step="1" min="-12" max="14" value="${esc(t.tz??"")}" inputmode="numeric"></label>
+      <label>Leaving<input id="tr_from" type="date" value="${esc(t.from||"")}"></label>
+      <label>Back<input id="tr_to" type="date" value="${esc(t.to||"")}"></label>
+    </div>
+    <div class="trip-opts"><label class="do-chk"><input type="checkbox" id="tr_fly" ${t.flying?"checked":""}><span><b>Flying</b></span></label><label class="do-chk"><input type="checkbox" id="tr_abroad" ${t.abroad?"checked":""}><span><b>Abroad</b></span></label></div>
+    <div class="ph" style="margin-top:4px"><h3 style="margin:0">Pack${nights?` for ${nights} night${nights===1?"":"s"}`:""}</h3><span class="muted">${n} of ${items.length} packed</span></div>
+    <ul class="do-pack">${items.map(([k,tt,sub])=>`<li><label class="do-chk ${packed[k]?"on":""}"><input type="checkbox" data-trpack="${esc(k)}" ${packed[k]?"checked":""}><span><b>${esc(tt)}</b>${sub?`<small>${esc(sub)}</small>`:""}</span></label></li>`).join("")}</ul>
+    <div class="btns"><button type="button" class="small danger" id="tripDel">Delete this trip</button></div>`;
+  const upd = (patch, rerender=true) => { const x={...trips[t.id], ...patch}; tripSave(x); if(rerender) renderTrip(); };
+  $("#tr_where").oninput = e => upd({where:e.target.value}, false);
+  $("#tr_tz").onchange = e => upd({tz:num(e.target.value)});
+  $("#tr_from").onchange = e => upd({from:e.target.value, to: t.to && t.to<e.target.value ? e.target.value : t.to});
+  $("#tr_to").onchange = e => upd({to:e.target.value});
+  $("#tr_fly").onchange = e => upd({flying:e.target.checked}); $("#tr_abroad").onchange = e => upd({abroad:e.target.checked});
+  el.querySelectorAll("[data-trpack]").forEach(c => c.onchange = () => upd({packed:{...(trips[t.id].packed||{}), [c.dataset.trpack]: c.checked}}));
+  $("#tripNew").onclick = tripNew; const pk=$("#tr_pick"); if(pk) pk.onchange = () => { tripCur=pk.value; renderTrip(); };
+  $("#tripDel").onclick = async () => { const id=t.id; delete trips[id]; tripCur=null; renderTrip(); await deleteWithUndo("trips", id, "Trip"); };
+}
+function tripNew(){ if(!canWrite) return toast("Saving isn't switched on here"); const from=ymd(Date.now()+7*864e5), to=ymd(Date.now()+10*864e5); const id="t"+Date.now().toString(36);
+  const t={id, where:"", from, to, flying:false, abroad:false, tz:null, packed:{}}; trips[id]=t; tripCur=id; tripSave(t); renderTrip(); setTimeout(()=>$("#tr_where")?.focus(),50); }
+renderNudge(); renderSettings(); renderTodos(); renderTrip();
+
 /* tap outside a pop-up to close it */
 document.querySelectorAll("dialog").forEach(dg => dg.addEventListener("click", e => { if(e.target!==dg) return; const r=dg.getBoundingClientRect(); if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom) dg.close(); }));
 /* ---------- storage ---------- */
@@ -2246,6 +2396,9 @@ renderAll();
   checkPushSub();
   base.collection("hba1c").onSnapshot(s => { a1c = s.docs.map(d => ({id:d.id, ...d.data()})); renderA1c(); }, () => {});
   base.collection("rx").doc("main").onSnapshot(s => { rx = s.exists ? s.data() : {}; renderRx(); renderComing(); }, () => {});
+  base.collection("settings").onSnapshot(s => { setChanges = s.docs.map(d => ({id:d.id, ...d.data()})); renderSettings(); }, () => {});
+  base.collection("todos").onSnapshot(s => { todos = s.docs.map(d => ({id:d.id, ...d.data()})); renderTodos(); renderComing(); }, () => {});
+  base.collection("trips").onSnapshot(s => { trips = {}; s.docs.forEach(d => { const x=d.data(); if(x?.id) trips[x.id]=x; }); const a=document.activeElement; if(!($("#tripPanel")?.contains(a) && a.tagName==="INPUT" && a.type!=="checkbox")) renderTrip(); renderComing(); }, () => {});
   base.collection("foods").onSnapshot(s => { foods = s.docs.map(d => ({id:d.id, ...d.data()})); renderFavs(); renderItems(); }, () => {});
 })();
 async function loadNames(){
