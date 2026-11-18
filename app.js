@@ -15,7 +15,7 @@ let db = null, base = null, plan = {}, log = [], supplies = [];
 let canWrite = false, me = null, names = {}, userCap = null;
 
 /* ---------- views ---------- */
-const VIEWS = ["viewer","handover","today","glucose","food","log","insulin","dayout","supplies","checks","appts","reports","sick","plan","backup","setup"];
+const VIEWS = ["viewer","handover","sites","today","glucose","food","log","insulin","dayout","supplies","checks","appts","reports","sick","plan","backup","setup"];
 function route(){
   const h0 = location.hash.slice(1), viewerMode = typeof isViewer==="function" && isViewer();
   const v = viewerMode ? "viewer" : (VIEWS.includes(h0) && h0!=="viewer" ? h0 : "today");
@@ -99,7 +99,7 @@ function renderHero(){ renderHeroRing(); try { $("#who").textContent = friendlyL
   const chips=[["Site",site.v.replace(" left",""),site.cls],["Carbs",t.carbs+" g",""],["Drinks",t.ml+" ml",""],["Last ate",lf?new Date(lf.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):"—",""],["Hypos 7d",String(wk),wk>=3?"warn":""]];
   $("#heroChips").innerHTML = chips.map(([k,v,c])=>`<div class="hchip ${c}"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>`).join("");
 }
-function renderAll(){ if(typeof applyRole==="function"){ applyRole(); renderMonthCard(); renderHandoverTab(); } renderHero(); renderStrip(); renderRecent(); renderFood(); renderLog(); renderSupplies(); renderSick(); renderItems(); renderGlucose(); renderChecks(); renderBackup(); renderMealPatterns(); renderComing(); renderAppts(); renderDeliveries(); renderReport(); renderFavs(); renderWeek(); renderSetup(); renderBgNow(); renderBgChecks(); renderInsulin(); renderVial(); renderSick2(); renderDayOut(); renderWatch(); }
+function renderAll(){ if(typeof applyRole==="function"){ applyRole(); renderMonthCard(); renderHandoverTab(); } if(typeof renderBedtime==="function"){ renderBedtime(); renderRotation(); } renderHero(); renderStrip(); renderRecent(); renderFood(); renderLog(); renderSupplies(); renderSick(); renderItems(); renderGlucose(); renderChecks(); renderBackup(); renderMealPatterns(); renderComing(); renderAppts(); renderDeliveries(); renderReport(); renderFavs(); renderWeek(); renderSetup(); renderBgNow(); renderBgChecks(); renderInsulin(); renderVial(); renderSick2(); renderDayOut(); renderWatch(); }
 const dayKey = ms => new Date(ms).toDateString();
 function dayTotals(key){ const es = log.filter(e => dayKey(e.at)===key && (e.type==="food"||e.type==="drink"));
   return { carbs: es.reduce((a,e)=>a+(e.carbs||0),0), ml: es.filter(e=>e.type==="drink").reduce((a,e)=>a+(e.ml||0),0), meals: es.filter(e=>e.type==="food").length, drinks: es.filter(e=>e.type==="drink").length, es }; }
@@ -426,11 +426,12 @@ function openEdit(id){
   const put = (sel,v) => { if(v!=null && v!=="") $(sel).value = v; };
   if(e.photo) loadPhoto(id).then(src => { if(editingId===id && photoData===undefined) showPhotoPrev(src); });
   put("#e_gl",e.gl); put("#e_ket",e.ket); put("#e_carbs",e.carbs); put("#e_item",e.item); put("#e_meal",e.meal); put("#e_ate",e.ate); put("#e_ml",e.ml); put("#e_note",e.note);
+  if(e.spot){ $("#e_spot").value = e.spot; renderSpotPicker(); }
 }
 function openEntry(type, pre={}){
   editingId = null; $("#dlgDelete").hidden = true;
   if(!canWrite){ (toast("Saving isn't switched on here. Open the page in a browser (see the note at the top)"), $("#dbNote").scrollIntoView({behavior:"smooth",block:"center"})); return; }
-  $("#entryForm").reset(); $("#e_type").value = type; $("#e_at").value = localNow();
+  $("#entryForm").reset(); $("#e_spot").value = ""; $("#e_type").value = type; $("#e_at").value = localNow();
   $("#dlgTitle").textContent = TYPES[type].label; setFields(type); $("#e_favWrap").hidden = true; $("#e_note").placeholder = "";
   photoData = undefined; showPhotoPrev(null); $("#carbCalc").open = false; ["#c_per","#c_g","#c_left"].forEach(i=>$(i).value=""); calcCarbs();
   if(type==="food"){ const h=new Date().getHours(); $("#e_meal").value = h<10?"Breakfast":h<11.5?"Morning snack":h<14?"Lunch":h<16.5?"Afternoon snack":h<19?"Dinner":"Bedtime snack"; }
@@ -446,6 +447,7 @@ function setFields(type){
   $("#e_item").placeholder = type==="drink" ? "e.g. Whole milk" : "e.g. Weetabix + whole milk";
   $("#e_carbsLabel").innerHTML = type==="food" ? "Carbs he ate <small>g</small>" : type==="hypo" ? "Carbs given <small>g</small>" : "Carbs <small>g</small>";
   $("#e_noteLabel").textContent = fd ? "Notes (optional)" : "What happened / what you did";
+  if((type==="site"||type==="sensor") && typeof renderSpotPicker==="function") setTimeout(renderSpotPicker,0);
 }
 $("#e_type").addEventListener("change", e => setFields(e.target.value));
 $("#e_item").addEventListener("change", () => {
@@ -462,6 +464,7 @@ $("#entryForm").addEventListener("submit", async ev => {
   ev.preventDefault();
   const e = { type:$("#e_type").value, at:new Date($("#e_at").value).getTime(), gl:num($("#e_gl").value), ket:num($("#e_ket").value), carbs:num($("#e_carbs").value), note:$("#e_note").value.trim(), by:me };
   if(e.type==="food"||e.type==="drink"){ e.item=$("#e_item").value.trim(); if(e.type==="food"){ e.meal=$("#e_meal").value; e.ate=$("#e_ate").value; } else { e.ml=num($("#e_ml").value); } e.gl=null; e.ket=null; }
+  if(e.type==="site"||e.type==="sensor"){ const sp=$("#e_spot").value; if(sp) e.spot=sp; }
   if(isNaN(e.at)) e.at = Date.now();
   if(!editingId && $("#e_at").value===localNow()) e.at = Date.now();   // keep the exact time so two entries in the same minute stay in order
   $("#dlgSave").disabled = true;
@@ -1297,7 +1300,7 @@ applyNight(); setInterval(applyNight, 60000); document.addEventListener("visibil
 
 
 /* ---------- version ---------- */
-const APP_VERSION = "7.0";
+const APP_VERSION = "7.2";
 document.querySelectorAll(".ver-n").forEach(e => e.textContent = APP_VERSION);
 { const nav=$("#nav"); if(nav && !nav.querySelector(".app-ver")){ const d=document.createElement("div"); d.className="app-ver nav-ver"; d.textContent="Version "+APP_VERSION; nav.insertBefore(d, $("#moreBtn")); } }
 
@@ -1625,7 +1628,7 @@ async function pushOff(){
 /* ===== design v3 helpers ===== */
 const VIEW_TITLES = {glucose:["Glucose","His CGM data, patterns and what they mean"], food:["Food & drink","Meals, drinks and how they affect his glucose"], log:["History","Everything you've logged, and the clinic summary"],
   supplies:["Supplies","Stock at home and the next delivery"], checks:["Growth & check-ups","Height, weight, eyes and teeth"], appts:["Appointments","GP, clinic, vaccinations and more"],
-  reports:["Reports","Round-ups to keep or share"], handover:["Handover","His sheet for anyone looking after him, and a record of each handover"], sick:["Sick day","What to do when he's unwell"], plan:["Care plan","His details, targets and contacts"], backup:["Backup","Keep a copy of everything"], setup:["Setup check","Is everything switched on and working?"], insulin:["Insulin","From his pump file: what the pump gave"], dayout:["Day out","Plan food, drinks and the bag before you go"]};
+  reports:["Reports","Round-ups to keep or share"], sites:["Sites & sensors","Log each change and where it went, so spots get rotated"], handover:["Handover","His sheet for anyone looking after him, and a record of each handover"], sick:["Sick day","What to do when he's unwell"], plan:["Care plan","His details, targets and contacts"], backup:["Backup","Keep a copy of everything"], setup:["Setup check","Is everything switched on and working?"], insulin:["Insulin","From his pump file: what the pump gave"], dayout:["Day out","Plan food, drinks and the bag before you go"]};
 for (const [k,[t,sub]] of Object.entries(VIEW_TITLES)) { const sec = document.getElementById("v-"+k); const ic = document.querySelector(`#nav a[href="#${k}"] .ic`); if(!sec || sec.querySelector(".view-head")) continue;
   const h = document.createElement("div"); h.className = "view-head"; h.innerHTML = `<span class="vh-ic">${ic?ic.outerHTML:""}</span><div><h1>${t}</h1><p>${sub}</p></div>`; sec.prepend(h); }
 function labelCardTables(){ document.querySelectorAll("table.cards").forEach(t => { const hs=[...t.querySelectorAll("thead th")].map(th=>th.textContent.trim()); t.querySelectorAll("tbody tr").forEach(tr => [...tr.children].forEach((td,i)=>{ if(hs[i] && !td.hasAttribute("colspan")) td.dataset.label = hs[i]; })); }); }
@@ -1949,7 +1952,7 @@ document.addEventListener("click", async ev => {
 
 
 /* ================= BACKUP ================= */
-const BK_COLS = ["log","cgm","pump","growth","checks","supplies","appts","foods","photos","dayplans","hba1c","rx","settings","todos","trips","handovers"];
+const BK_COLS = ["log","cgm","pump","growth","checks","supplies","appts","foods","photos","dayplans","hba1c","rx","settings","todos","trips","handovers","bedtime"];
 let lastBackup = null, dl = null, fileBackupAt = null;
 function bkStatus(m){ const n=$("#bkStatus"); n.hidden=!m; n.textContent=m||""; }
 function renderBackup(){
@@ -2492,6 +2495,84 @@ function renderViewers(){
 }
 renderHandoverTab(); renderUsage(); renderMonthCard();
 
+/* ================= v7.1 ================= */
+/* --- Site rotation map --- */
+const SPOTS = {
+  tummyR:{label:"Tummy (his right)", v:"f", x:47, y:98, w:27, h:44}, tummyL:{label:"Tummy (his left)", v:"f", x:76, y:98, w:27, h:44},
+  thighR:{label:"Thigh (his right)", v:"f", x:50, y:162, w:22, h:44}, thighL:{label:"Thigh (his left)", v:"f", x:78, y:162, w:22, h:44},
+  armL:{label:"Arm (his left)", v:"b", x:180, y:68, w:14, h:42}, armR:{label:"Arm (his right)", v:"b", x:256, y:68, w:14, h:42},
+  bottomL:{label:"Bottom (his left)", v:"b", x:197, y:124, w:27, h:36}, bottomR:{label:"Bottom (his right)", v:"b", x:226, y:124, w:27, h:36}
+};
+const spotLabel = k => SPOTS[k]?.label || "";
+function spotHistory(kind){ return log.filter(e=>e.type===kind && e.spot && SPOTS[e.spot]).sort((a,b)=>b.at-a.at); }
+function spotInfo(kind){
+  const h=spotHistory(kind), lastUse={}, rank={};
+  h.forEach((e,i)=>{ if(lastUse[e.spot]==null){ lastUse[e.spot]=e.at; rank[e.spot]=i; } });
+  const used=Object.keys(lastUse);
+  const pool = used.length>=2 ? used : Object.keys(SPOTS);
+  const suggest = h.length ? pool.filter(k=>k!==h[0].spot).sort((a,b)=>(lastUse[a]??0)-(lastUse[b]??0))[0] : null;
+  return {h, lastUse, rank, suggest};
+}
+function spotSvg(kind, selected, clickable){
+  const {rank, suggest} = spotInfo(kind);
+  const fill = k => rank[k]==null ? "var(--surface)" : rank[k]===0 ? "var(--page)" : rank[k]<3 ? "color-mix(in srgb,var(--page) 55%,var(--surface))" : rank[k]<6 ? "color-mix(in srgb,var(--page) 25%,var(--surface))" : "color-mix(in srgb,var(--page) 10%,var(--surface))";
+  const body = cx => `<circle cx="${cx}" cy="40" r="20" class="sp-body"/><rect x="${cx-30}" y="62" width="60" height="92" rx="22" class="sp-body"/><rect x="${cx-46}" y="64" width="16" height="74" rx="8" class="sp-body"/><rect x="${cx+30}" y="64" width="16" height="74" rx="8" class="sp-body"/><rect x="${cx-27}" y="148" width="25" height="96" rx="11" class="sp-body"/><rect x="${cx+2}" y="148" width="25" height="96" rx="11" class="sp-body"/>`;
+  const zones = Object.entries(SPOTS).map(([k,z])=>`<rect ${clickable?`data-spot="${k}" tabindex="0" role="button" aria-label="${z.label}"`:""} class="sp-zone ${k===selected?"sel":""} ${k===suggest?"sug":""}" x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="7" fill="${k===selected?"var(--page)":fill(k)}"/>${k===suggest&&k!==selected?`<text x="${z.x+z.w/2}" y="${z.y+z.h/2+4}" text-anchor="middle" class="sp-star">★</text>`:""}${k===selected?`<text x="${z.x+z.w/2}" y="${z.y+z.h/2+5}" text-anchor="middle" class="sp-tick">✓</text>`:""}`).join("");
+  return `<svg viewBox="0 0 300 262" class="spot-svg" role="img" aria-label="Where on his body">${body(75)}${body(225)}${zones}<text x="75" y="258" text-anchor="middle" class="sp-cap">Front</text><text x="225" y="258" text-anchor="middle" class="sp-cap">Back</text></svg>`;
+}
+function renderSpotPicker(){
+  const w=$("#e_spotWrap"); if(!w) return; const kind=$("#e_type").value; if(!["site","sensor"].includes(kind)) return;
+  const sel=$("#e_spot").value, info=spotInfo(kind);
+  w.querySelector(".sp-map").innerHTML = spotSvg(kind, sel, true);
+  const days = k => info.lastUse[k] ? Math.floor((Date.now()-info.lastUse[k])/864e5) : null;
+  w.querySelector(".sp-msg").innerHTML = sel ? `<b>${esc(spotLabel(sel))}</b>${days(sel)!=null?` · last used ${days(sel)===0?"today":days(sel)+" day"+(days(sel)===1?"":"s")+" ago"}`:" · not used before"}${info.h[0]?.spot===sel?` <span class="warn">Same place as last time</span>`:""}`
+    : info.suggest ? `Suggested: <b>${esc(spotLabel(info.suggest))}</b> ★ ${days(info.suggest)!=null&&days(info.suggest)>0?`(not used for ${days(info.suggest)} day${days(info.suggest)===1?"":"s"})`:""}. Tap where it went.` : `Tap where it went.`;
+  w.querySelectorAll("[data-spot]").forEach(z => { const pick = () => { $("#e_spot").value = $("#e_spot").value===z.dataset.spot ? "" : z.dataset.spot; renderSpotPicker(); };
+    z.addEventListener("click", pick); z.addEventListener("keydown", ev => { if(ev.key==="Enter"||ev.key===" "){ ev.preventDefault(); pick(); } }); });
+}
+function rotPanel(el, kind){
+  const info=spotInfo(kind), word = kind==="site" ? "infusion set" : "sensor";
+  el.innerHTML = `<div class="ph"><h2>${kind==="site"?"Infusion set spots":"Sensor spots"}</h2></div>
+    <div class="rot-grid"><div class="sp-map">${spotSvg(kind, null, false)}</div>
+    <div class="rot-side">${info.suggest?`<div class="rot-next"><span class="k">Next spot</span><b>${esc(spotLabel(info.suggest))}</b><span class="muted">${(()=>{ const t=info.lastUse[info.suggest]; if(!t) return "not used yet"; const d=Math.floor((Date.now()-t)/864e5); return d<1?"last used today":`not used for ${d} day${d===1?"":"s"}`; })()}</span></div>`:""}
+      ${info.h.length ? `<ul class="rot-list">${info.h.slice(0,6).map(e=>`<li><span>${esc(spotLabel(e.spot))}</span><small>${fmtD(e.at).replace(/ \d{4}$/,"")}</small></li>`).join("")}</ul>` : `<p class="muted" style="margin:0">When you log a ${word} change, tap where it went. The map fills in and suggests the next spot.</p>`}
+      <div class="rot-key"><span><i style="background:var(--page)"></i>Last time</span><span><i style="background:color-mix(in srgb,var(--page) 55%,var(--surface))"></i>Recent</span><span><i style="background:color-mix(in srgb,var(--page) 12%,var(--surface))"></i>A while ago</span><span>★ Suggested</span></div></div></div>`;
+}
+function renderRotation(){
+  const a=$("#rotSite"), b=$("#rotSensor"); if(!a||!b) return; rotPanel(a,"site"); rotPanel(b,"sensor");
+  const ss=siteStatus(), se=sensorStatus(); $("#stSiteN").textContent = ss.v==="—" ? "Set and reservoir" : `${ss.v} · ${ss.n.toLowerCase()}`; $("#stSensorN").textContent = se.v==="—" ? (P("cgm")||"Sensor") : `${se.v} · ${se.n.toLowerCase()}`;
+  const H=log.filter(e=>e.type==="site"||e.type==="sensor").sort((x,y)=>y.at-x.at).slice(0,12);
+  $("#rotHist").innerHTML = H.length ? H.map(e=>`<li><button type="button" class="rh-row" data-rhedit="${esc(e.id)}"><span class="chip blue">${e.type==="site"?"Infusion set":"Sensor"}</span><span class="rh-where">${e.spot?esc(spotLabel(e.spot)):`<i>Where? Tap to add</i>`}</span><small>${fmtT(e.at)}</small></button></li>`).join("")
+    : `<li class="muted">No changes logged yet.</li>`;
+  document.querySelectorAll("[data-rhedit]").forEach(bn => bn.onclick = () => openEdit(bn.dataset.rhedit));
+}
+/* --- Bedtime check (Today, evenings) --- */
+var bedDocs = {};
+const BED_ITEMS = [["bg","Check his glucose"],["kit","Hypo treatment and meter by his bed"],["res","Enough insulin in the reservoir for the night"],["batt","Pump battery OK"],["cgm","Sensor working, CGM alerts on and loud"]];
+function bedKey(){ const d=new Date(); if(d.getHours()<4) d.setDate(d.getDate()-1); return ymd(d.getTime()); }
+function renderBedtime(){
+  const el=$("#bedCard"); if(!el) return; const ae=document.activeElement; if(el.contains(ae) && ae.tagName==="INPUT" && ae.type==="number") return; const h=new Date().getHours(), key=bedKey(), doc=bedDocs[key]||{};
+  if(!(h>=18 || h<4)){ el.hidden=true; return; } el.hidden=false;
+  const s=lastSite(), due = s ? s.at+(num(plan.siteDays)??3)*864e5 : null, siteSoon = due && due-Date.now() < 12*36e5;
+  const items = [...BED_ITEMS, ...(siteSoon?[["site", due<Date.now()?"Site change is overdue: change it now":"Site change due overnight: change it now or set an alarm"]]:[])];
+  const ticks=doc.ticks||{}, n=items.filter(([k])=>ticks[k]).length, who = id => id===me ? "you" : ((window.__family?.names||{})[id] || names[id] || "the other parent");
+  if(doc.done){ el.className="panel bed-card done"; el.innerHTML = `<div class="ph"><h2>Bedtime check done</h2><button type="button" class="small" id="bedUndo">Undo</button></div><p class="muted" style="margin:0">By ${esc(who(doc.by))} at ${new Date(doc.doneAt).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})}${doc.gl!=null?` · BG ${doc.gl.toFixed(1)}`:""} · ${n} of ${items.length} ticked${n<items.length?`: missed ${items.filter(([k])=>!ticks[k]).map(([,t])=>t.toLowerCase()).join(", ")}`:""}</p>`;
+    $("#bedUndo").onclick = () => bedWrite({done:false, doneAt:null}); return; }
+  const g = typeof latestGlucose==="function" ? latestGlucose() : null, gRecent = g && Date.now()-g.t < 30*6e4;
+  el.className = "panel bed-card" + (h>=21 || h<4 ? " late" : "");
+  el.innerHTML = `<div class="ph"><h2>Bedtime check</h2><span class="muted">${n} of ${items.length}</span></div>
+    <ul class="do-pack">${items.map(([k,t])=>`<li><label class="do-chk ${ticks[k]?"on":""}"><input type="checkbox" data-bed="${k}" ${ticks[k]?"checked":""}><span><b>${esc(t)}</b>${k==="bg"?`<small>${gRecent?`CGM says ${g.v.toFixed(1)} (${ago(g.t)})`:"Finger prick or CGM"}</small>`:""}</span></label>${k==="bg"?`<input id="bedGl" class="bed-gl" type="number" step="0.1" min="1" max="33" inputmode="decimal" placeholder="mmol/L" value="${doc.gl!=null?doc.gl:(gRecent?g.v.toFixed(1):"")}" aria-label="His glucose at bedtime">`:""}</li>`).join("")}</ul>
+    <div class="btns"><button type="button" class="primary" id="bedDone">Done</button><span class="muted" style="align-self:center;font-size:.85rem">The other parent will see it's done.</span></div>`;
+  el.querySelectorAll("[data-bed]").forEach(c => c.onchange = () => bedWrite({ticks:{...(bedDocs[key]?.ticks||{}), [c.dataset.bed]:c.checked}}));
+  $("#bedDone").onclick = async () => { const gl=num($("#bedGl").value); await bedWrite({done:true, doneAt:Date.now(), gl, ticks:{...(bedDocs[key]?.ticks||{}), ...(gl!=null?{bg:true}:{})}});
+    if(gl!=null && !(gRecent && Math.abs(g.v-gl)<0.05)) { try { await base.collection("log").add({type:"bg", at:Date.now(), gl, ket:null, carbs:null, note:"Bedtime check", by:me}); } catch {} }
+    toast("Bedtime check done"); };
+}
+async function bedWrite(patch){ if(!canWrite) return toast("Saving isn't switched on here"); const key=bedKey(); const doc={date:key, ...(bedDocs[key]||{}), ...patch, by:me, at:Date.now()}; bedDocs[key]=doc; renderBedtime();
+  try { await base.collection("bedtime").doc(key).set(doc); } catch { toast("Couldn't save"); } }
+setInterval(() => { if(!document.hidden) renderBedtime(); }, 5*60e3);
+renderRotation(); renderBedtime();
+
 /* tap outside a pop-up to close it */
 document.querySelectorAll("dialog").forEach(dg => dg.addEventListener("click", e => { if(e.target!==dg) return; const r=dg.getBoundingClientRect(); if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom) dg.close(); }));
 /* ---------- storage ---------- */
@@ -2529,6 +2610,7 @@ renderAll();
   base.collection("trips").onSnapshot(s => { trips = {}; s.docs.forEach(d => { const x=d.data(); if(x?.id) trips[x.id]=x; }); const a=document.activeElement; if(!($("#tripPanel")?.contains(a) && a.tagName==="INPUT" && a.type!=="checkbox")) renderTrip(); renderComing(); }, () => {});
   base.collection("handovers").onSnapshot(s => { handovers = s.docs.map(d => ({id:d.id, ...d.data()})); renderHandoverTab(); }, () => {});
   base.collection("usage").onSnapshot(s => { usageDocs = {}; s.docs.forEach(d => usageDocs[d.id] = d.data()); renderUsage(); }, () => {});
+  base.collection("bedtime").orderBy("date","desc").limit(14).onSnapshot(s => { bedDocs = {}; s.docs.forEach(d => { const x=d.data(); if(x?.date) bedDocs[x.date]=x; }); renderBedtime(); }, () => {});
   base.collection("foods").onSnapshot(s => { foods = s.docs.map(d => ({id:d.id, ...d.data()})); renderFavs(); renderItems(); }, () => {});
 })();
 async function loadNames(){

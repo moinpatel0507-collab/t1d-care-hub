@@ -44,6 +44,7 @@ img{max-width:100%}
     <a href="#food" class="pri"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18M4.5 3v5a2.5 2.5 0 0 0 5 0V3M18 21V3c-2.2 0-3.5 3-3.5 7h3.5"/></svg><span>Food</span></a>
     <a href="#log" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg><span>History</span></a>
     <a href="#insulin" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 3.5l6 6M17.5 6.5l-9.5 9.5-3 1 1-3 9.5-9.5"/><path d="M5 19l-2 2M11 7l6 6"/></svg><span>Insulin</span></a>
+    <a href="#sites" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg><span>Sites &amp; sensors</span></a>
     <a href="#dayout" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="13" rx="2.5"/><path d="M9 7V5a3 3 0 0 1 6 0v2M4 12h16"/></svg><span>Day out</span></a>
     <div class="nav-group">His health</div>
     <a href="#appts" class="pri"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h3"/></svg><span class="l-long">Appointments</span><span class="l-short">Appts</span></a>
@@ -65,6 +66,7 @@ img{max-width:100%}
       <div class="sheet-group">Every day</div>
       <a href="#log"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg><span>History</span></a>
       <a href="#insulin"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 3.5l6 6M17.5 6.5l-9.5 9.5-3 1 1-3 9.5-9.5"/><path d="M5 19l-2 2M11 7l6 6"/></svg><span>Insulin</span></a>
+      <a href="#sites"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg><span>Sites &amp; sensors</span></a>
       <a href="#dayout"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="13" rx="2.5"/><path d="M9 7V5a3 3 0 0 1 6 0v2M4 12h16"/></svg><span>Day out</span></a>
       <div class="sheet-group">His health</div>
       <a href="#checks"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11M10 20V5M16 20v-6M2 20h20"/><path d="M20 4v6M17 7h6"/></svg><span>Growth</span></a>
@@ -92,6 +94,7 @@ img{max-width:100%}
     <div class="today-top"><section class="rings" id="rings" aria-label="Infusion set and sensor"></section></div>
     <div class="strip" id="strip"></div>
     <div class="panel month-card" id="monthCard" hidden></div>
+    <div class="panel bed-card" id="bedCard" hidden></div>
     <div class="panel" id="comingPanel">
       <div><h2>Coming days</h2><div class="muted">What's due this week, and the times his past data says to keep an eye on. Patterns from the last 14 days, not predictions.</div></div>
       <div class="twochart"><div class="mpcard"><h3>Coming up</h3><ul class="agenda" id="agenda"></ul></div><div class="mpcard"><h3>Be ready for</h3><ul class="plain" id="watchList"></ul></div></div>
@@ -486,6 +489,21 @@ img{max-width:100%}
     </div>
   </section>
 
+  <!-- SITES & SENSORS -->
+  <section id="v-sites" class="view" hidden>
+    <div class="panel">
+      <div class="ph"><h2>Log a change</h2></div>
+      <div class="sites-do">
+        <button type="button" class="sites-btn" data-q="site"><span class="sb-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg></span><span><b>Infusion set changed</b><small id="stSiteN">Set and reservoir</small></span></button>
+        <button type="button" class="sites-btn" data-q="sensor"><span class="sb-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg></span><span><b>Sensor changed</b><small id="stSensorN">Guardian sensor</small></span></button>
+      </div>
+      <div class="muted" style="font-size:.9rem">Tap where it went on the body map each time. The app suggests the next spot so you keep moving around.</div>
+    </div>
+    <div class="panel" id="rotSite"></div>
+    <div class="panel" id="rotSensor"></div>
+    <div class="panel"><div class="ph"><h2>Recent changes</h2><span class="muted">Tap one to edit or add where it went</span></div><ul class="rot-hist" id="rotHist"></ul></div>
+  </section>
+
   <!-- HANDOVER -->
   <section id="v-handover" class="view" hidden>
     <div class="ho-active" id="hoActive" hidden></div>
@@ -555,6 +573,7 @@ img{max-width:100%}
       <button type="button" class="small" id="e_photoDel" hidden>Remove photo</button>
     </div>
     <label class="check" id="e_favWrap" hidden><input type="checkbox" id="e_fav"> Add to his usual foods</label>
+    <div class="spot-pick" id="e_spotWrap" data-for="site sensor"><span class="sp-h">Where did it go?</span><input type="hidden" id="e_spot" value=""><div class="sp-map"></div><div class="sp-msg muted"></div></div>
     <label><span id="e_noteLabel">What happened / what you did</span><textarea id="e_note"></textarea></label>
     <div class="btns" style="justify-content:flex-end"><button type="button" class="danger" id="dlgDelete" hidden style="margin-right:auto">Delete</button><button type="button" id="dlgCancel">Cancel</button><button class="primary" type="submit" id="dlgSave">Save</button></div>
   </form>

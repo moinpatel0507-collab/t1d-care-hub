@@ -37,7 +37,7 @@ jobs:
             const page = await r.json(); rows.push(...page); if (page.length < 1000) break;
           }
           if (!rows.length) { console.error('::error::No records found. Is SUPABASE_SECRET_KEY the secret (not publishable) key?'); process.exit(1); }
-          const COLS = ['log', 'cgm', 'pump', 'growth', 'checks', 'supplies', 'appts', 'foods', 'dayplans', 'hba1c', 'rx', 'settings', 'todos', 'trips', 'handovers'];
+          const COLS = ['log', 'cgm', 'pump', 'growth', 'checks', 'supplies', 'appts', 'foods', 'dayplans', 'hba1c', 'rx', 'settings', 'todos', 'trips', 'handovers', 'bedtime'];
           const fams = [...new Set(rows.map(r => r.family_id))];
           const day = new Date().toISOString().slice(0, 10);
           const fs = await import('fs');
