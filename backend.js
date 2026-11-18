@@ -414,7 +414,11 @@ function renderAutoBackup() {
   if (L === null) body = '<p class="muted">Checking backups…</p>';
   else if (abState.missing) body = `<div class="band high"><strong>Automatic backups aren't switched on yet</strong><span>In Supabase, open <b>SQL Editor → New query</b>, paste the file <code>backup-setup.sql</code> from your GitHub folder and press <b>Run</b>. Then reopen this page.</span></div>`;
   else if (!L.length) body = '<p class="muted">No backups yet. The first one is made automatically once there is something to save.</p>';
-  else body = `<ul class="ab-list">${L.map((b, i) => `<li><span class="ab-day"><b>${niceDay(b.day)}</b><small>${hhmm(b.created_at)} · ${Number(b.items).toLocaleString('en-GB')} item${b.items == 1 ? '' : 's'}</small></span>${i === 0 ? '<span class="chip ok">Latest</span>' : ''}<button type="button" class="small" data-abr="${b.day}">Restore</button></li>`).join('')}</ul>`;
+  else {
+    const L0 = L[0], fresh = L0.day === ukDay() || L0.day === ukDay(new Date(Date.now() - 864e5));
+    body = `<div class="bk-status ${fresh ? '' : 'warn'}">${fresh ? '✓' : '!'} Last backup ${niceDay(L0.day).toLowerCase()} at ${hhmm(L0.created_at)}</div>
+      <details class="bk-older"><summary>Go back to an earlier day (${L.length} kept)</summary><ul class="ab-list">${L.map(b => `<li><span class="ab-day"><b>${niceDay(b.day)}</b><small>${hhmm(b.created_at)} · ${Number(b.items).toLocaleString('en-GB')} item${b.items == 1 ? '' : 's'}</small></span><button type="button" class="small" data-abr="${b.day}">Restore</button></li>`).join('')}</ul></details>`;
+  }
   p.querySelector('.ab-body').innerHTML = body;
   const st = p.querySelector('.ab-status'); st.hidden = !abState.msg; st.innerHTML = abState.msg;
   p.querySelector('#abNow').disabled = !!abState.busy || abState.missing;
@@ -451,13 +455,13 @@ async function restoreBackup(day) {
 function addAutoBackupPanel() {
   const host = document.querySelector('#v-backup'); if (!host || document.getElementById('autoBk')) return;
   const p = document.createElement('div'); p.className = 'panel'; p.id = 'autoBk';
-  p.innerHTML = `<div><h2>Automatic daily backups</h2><div class="muted">Made every night, and when either of you first opens the app each day. The last 30 days are kept online. Restore any day here.</div></div>
+  p.innerHTML = `<div class="bk-h"><span class="bk-ic ok" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V7z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg></span><div><h2>Automatic backups</h2><p class="muted">Every night, online, last 30 days kept. Nothing to do.</p></div></div>
     <div class="ab-body"></div><div class="ab-status notice" hidden></div>
-    <div class="btns"><button type="button" id="abNow">Back up now</button></div>`;
+    <div class="btns"><button type="button" class="small" id="abNow">Back up now</button></div>`;
   const head = host.querySelector('.view-head'); host.insertBefore(p, head ? head.nextSibling : host.firstChild);
   p.querySelector('#abNow').onclick = async () => {
     abState.busy = 'now'; abState.msg = ''; renderAutoBackup();
-    try { const n = await backupNow(); await listBackups(); abState.msg = `Backed up ${Number(n).toLocaleString('en-GB')} items.`; }
+    try { const n = await backupNow(); await listBackups(); abState.msg = `Backed up ${Number(n).toLocaleString('en-GB')} item${n == 1 ? '' : 's'}.`; }
     catch (e) { abState.msg = `Couldn't back up: ${esc(e.message || e)}`; }
     abState.busy = ''; renderAutoBackup();
   };

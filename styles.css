@@ -198,7 +198,7 @@ nav#nav .more{display:none}
   .hero{padding:26px 30px}
   .hero-sub{max-width:80ch}
   #v-plan{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);align-items:start}
-  #v-backup{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);align-items:start}
+  #v-backup{grid-template-columns:minmax(0,1fr)}
   .twochart{grid-template-columns:1fr 1fr}
 }
 @media (min-width:1400px){ .strip{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))} }
@@ -500,7 +500,7 @@ button.primary{background:var(--accent);border:0;box-shadow:none;color:#fff}
 #v-glucose .vh-ic{background:var(--c-red)} #v-food .vh-ic{background:var(--c-green)} #v-supplies .vh-ic{background:var(--c-orange)} #v-appts .vh-ic{background:var(--c-purple)} #v-checks .vh-ic{background:var(--c-teal)} #v-sick .vh-ic{background:var(--c-alert)} #v-growth .vh-ic{background:var(--c-green)} #v-reports .vh-ic{background:var(--c-blue)} #v-setup .vh-ic{background:var(--c-green)}
 
 /* ----- care plan: grouped cards ----- */
-#v-plan{display:grid!important;grid-template-columns:minmax(0,1fr)!important}
+#v-plan:not([hidden]){display:grid!important;grid-template-columns:minmax(0,1fr)!important}
 #v-plan>*{grid-column:1/-1}
 .plan-form{display:grid;gap:16px}
 .plan-intro{margin:0 2px;font-size:.92rem}
@@ -818,6 +818,25 @@ dialog{background:var(--surface);color:var(--fg);border-radius:26px}
 .hypo-go.quiet{background:var(--surface)!important;color:var(--fg)!important;min-height:56px;padding:10px 14px!important;border-radius:18px!important;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--c-red) 35%,transparent)!important}
 .hypo-go.quiet .hg-ic{background:var(--low-soft)!important;color:var(--low);width:36px;height:36px}
 .hypo-go.quiet b{font-size:16px!important;color:var(--low)} .hypo-go.quiet small{color:var(--muted);opacity:1}
+
+/* ===== v2.3 · each page shows only its own things ===== */
+#v-today>#strip,#v-today .sick-link{display:none!important}
+.today-top{grid-template-columns:1fr!important}
+.see-all{font-size:14px;font-weight:700;text-decoration:none;color:var(--accent);min-height:44px;display:inline-flex;align-items:center}
+
+/* ===== backup page: two simple cards ===== */
+#v-backup:not([hidden]){display:grid!important;grid-template-columns:minmax(0,1fr)!important;max-width:760px}
+#v-backup .panel{gap:12px}
+.bk-h{display:flex;gap:14px;align-items:flex-start}
+.bk-h h2{margin:0} .bk-h p{margin:2px 0 0;font-size:14px}
+.bk-ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none;background:var(--accent-soft);color:var(--accent)}
+.bk-ic.ok{background:var(--ok-soft);color:var(--ok)}
+.bk-line{margin:0;font-size:15px;font-weight:600}
+.bk-note{margin:0;font-size:13px;color:var(--muted)}
+.bk-status{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:16px;background:var(--ok-soft);color:var(--ok);font-weight:700}
+.bk-status.warn{background:var(--high-soft);color:var(--high)}
+.bk-older summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center;color:var(--accent);list-style:none}
+.bk-older summary::-webkit-details-marker{display:none}
 
 /* ===== sign-in & family setup (family app) ===== */
 #authGate{position:fixed;inset:0;z-index:100;background:var(--bg);overflow-y:auto;display:grid;place-items:start center;padding:max(24px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}

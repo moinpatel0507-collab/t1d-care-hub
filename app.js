@@ -169,7 +169,7 @@ function entryHTML(e){
     <div class="row-acts"><button class="small" data-ledit="${esc(e.id)}" ${canWrite?"":"disabled"}>Edit</button><button class="small danger" data-del="${esc(e.id)}" ${canWrite?"":"disabled"}>Delete</button></div></li>`;
 }
 function renderRecent(){
-  const r = log.slice(0,6);
+  const r = log.slice(0,3);
   $("#recent").innerHTML = r.length ? r.map(entryHTML).join("") : `<li style="display:block"><div class="empty">Nothing logged yet. Use a quick-log button above. Start with his last pod and sensor change so the countdowns work.</div></li>`;
 }
 function entryText(e){ return [TYPES[e.type]?.label, e.meal, e.item, e.note, e.ate, e.gl!=null?e.gl.toFixed(1):"", e.ket!=null?e.ket.toFixed(1):"", e.carbs!=null?e.carbs+" g":"", e.ml!=null?e.ml+" ml":"", new Date(e.at).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})].filter(Boolean).join(" ").toLowerCase(); }
@@ -1286,13 +1286,10 @@ function setupItems(){
     {ok: !!F, t:"Family app", d: F ? "Signed in and sharing with the family" : "This copy isn't the family app, so nothing is shared", href:"#backup", skip: !F},
     {ok: F ? F.members>=2 : null, t:"His mum has joined", d: F ? (F.members>=2 ? `${F.members} people in the family` : "Only you so far. Share the family code from Care plan") : "Family app only", href:"#plan"},
     {ok: F ? F.signupsClosed : null, t:"New sign-ups closed", d: F ? (F.signupsClosed===true ? "No one else can create an account" : F.signupsClosed===false ? "Anyone with the link can register. Turn off sign-ups in Supabase (Authentication → Sign In / Providers)" : "Couldn't check") : "Family app only"},
-    {ok: !!(P("name") && P("hypoTx")), t:"Care plan filled in", d: P("hypoTx") ? "Name and hypo treatment are set" + (P("teamDay")?"":" · add the diabetes team's number") : "Add his hypo treatment from his diabetes team", href:"#plan"},
     {ok: bkAge!=null && bkAge<36, t:"Daily backup", d: bkAge==null ? "No backup yet" : bkAge<36 ? `Last backup ${ago(lastBackup)}` : `Last backup ${ago(lastBackup)}. Check backup-setup.sql was run in Supabase`, href:"#backup"},
     {ok: offsite ? (Date.now()-offsite)/36e5<36 : (F?false:null), t:"Off-site backup (GitHub)", d: offsite ? `Last copy ${ago(offsite)}` : F ? "Not seen yet. Add daily-backup.yml and its 3 secrets in GitHub" : "Family app only"},
     {ok: pushSubbed, t:"Notifications on this phone", d: pushSubbed ? "This phone gets reminders" : "Turn them on below", href:"#pushPanel"},
     {ok: remindersRun ? (Date.now()-remindersRun)/36e5<30 : (F?false:null), t:"Reminder job (GitHub)", d: remindersRun ? `Last ran ${ago(remindersRun)}` : F ? "Not seen yet. Add reminders.yml and the VAPID_PRIVATE_KEY secret in GitHub" : "Family app only"},
-    {ok: supplies.length>0 && !!(delivery.last||delivery.next), t:"Supplies and deliveries", d: supplies.length ? (delivery.last||delivery.next ? `${supplies.length} items tracked, next delivery set` : "Set the delivery date on Supplies") : "Add his supplies and stock", href:"#supplies"},
-    {ok: !!lastCgm && (Date.now()-keyToMs(lastCgm))/864e5<15, t:"CGM data imported", d: lastCgm ? `Latest day: ${new Date(keyToMs(lastCgm)).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}` : "Import his CareLink file on Glucose", href:"#glucose"},
     {ok: !!inst, t:"Installed on this phone", d: inst ? "Opens like an app" : "iPhone: Safari → Share → Add to Home Screen. Android: menu → Install app"},
   ].filter(x=>!x.skip);
 }
@@ -1673,14 +1670,11 @@ document.addEventListener("click", async ev => {
 
 /* ================= BACKUP ================= */
 const BK_COLS = ["log","cgm","pump","growth","checks","supplies","appts","foods"];
-let lastBackup = null, dl = null;
+let lastBackup = null, dl = null, fileBackupAt = null;
 function bkStatus(m){ const n=$("#bkStatus"); n.hidden=!m; n.textContent=m||""; }
 function renderBackup(){
-  const el=$("#bkLast"); const days = lastBackup ? Math.floor((Date.now()-lastBackup)/864e5) : null;
-  el.className = "stat " + (days===null ? (log.length?"warn":"") : days>30 ? "warn" : "");
-  el.querySelector(".v").textContent = lastBackup ? (days===0?"Today":days===1?"Yesterday":days+" days ago") : "—";
-  el.querySelector(".n").textContent = lastBackup ? fmtD(lastBackup) : "Never";
-  $("#bkCount").textContent = (log.length + Object.keys(cgmDays).length + growth.length + checks.length + supplies.length).toLocaleString("en-GB");
+  const el=$("#bkLine"); if(!el) return; const at = fileBackupAt;
+  el.textContent = at ? `Last copy saved ${ago(at)} (${fmtD(at)})` : "Not saved to a file yet";
 }
 $("#bkExport").addEventListener("click", async e => {
   const btn=e.currentTarget; if(!base) return bkStatus("Saving isn't available in this view.");
@@ -1692,7 +1686,7 @@ $("#bkExport").addEventListener("click", async e => {
     for(const c of BK_COLS){ const snap = await base.collection(c).get(); out[c] = snap.docs.map(d=>({id:d.id, ...d.data()})); }
     const nm = (plan.name||"son").trim().replace(/[^A-Za-z0-9]+/g,"-") || "son";
     const r = await dl.save({filename:`T1D-backup-${nm}-${ymd(Date.now())}.json`, data:JSON.stringify(out)});
-    if(r.status==="saved"){ await base.collection("meta").doc("backup").set({at:Date.now(), by:me}); bkStatus(`Backup saved: ${out.log.length} log entries, ${out.cgm.length} days of CGM, ${out.growth.length} measurements, ${out.checks.length} check-ups, ${out.supplies.length} supplies.`); }
+    if(r.status==="saved"){ await base.collection("meta").doc("backup").set({at:Date.now(), by:me}); await base.collection("meta").doc("filebackup").set({at:Date.now(), by:me}).catch(()=>{}); bkStatus(`Backup saved: ${out.log.length} log entries, ${out.cgm.length} days of CGM, ${out.growth.length} measurements, ${out.checks.length} check-ups, ${out.supplies.length} supplies.`); }
     else bkStatus("");
   } catch(err){ bkStatus(err.code==="declined" ? "Backup cancelled." : err.code==="rate_limited" ? "A save prompt is already open. Finish that one first." : "Couldn't make the backup. Try again."); }
   finally { btn.disabled=false; }
@@ -1800,6 +1794,7 @@ renderAll();
   base.collection("appts").onSnapshot(s => { appts = s.docs.map(d => ({id:d.id, ...d.data()})); renderAppts(); renderChecks(); renderComing(); renderStrip(); ok(s); }, fail);
   base.collection("checks").onSnapshot(s => { checks = s.docs.map(d => ({id:d.id, ...d.data()})); renderChecks(); renderAppts(); renderStrip(); ok(s); }, fail);
   base.collection("meta").doc("delivery").onSnapshot(s => { delivery = s.exists ? s.data() : {}; renderDeliveries(); renderSupplies(); renderComing(); }, () => {});
+  base.collection("meta").doc("filebackup").onSnapshot(s => { fileBackupAt = s.exists ? s.data().at : null; renderBackup(); }, () => {});
   base.collection("meta").doc("backup").onSnapshot(s => { lastBackup = s.exists ? s.data().at : null; renderBackup(); renderStrip(); }, () => {});
   base.collection("supplies").onSnapshot(s => { supplies = s.docs.map(d => ({id:d.id, ...d.data()})); renderAll(); ok(s); }, fail);
   base.collection("meta").doc("push").onSnapshot(s => { pushMeta = s.exists ? s.data() : {}; renderPush(); }, () => {});

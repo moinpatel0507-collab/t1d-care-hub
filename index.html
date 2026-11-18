@@ -79,9 +79,8 @@ img{max-width:100%}
     <div id="hypoBanner" class="hypo-banner" hidden></div>
     <button type="button" class="hypo-go" id="hypoGo"><span class="hg-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15M6 13l6 6 6-6"/></svg></span><span><b>He's low</b><small>Treatment steps and a 15-minute recheck</small></span></button>
     <section class="panel bgnow" id="bgNow" aria-label="Latest glucose"></section>
-    <div class="today-top"><section class="rings" id="rings" aria-label="Infusion set and sensor"></section><section class="panel tstats" id="todayStats" aria-label="Today so far"></section></div>
+    <div class="today-top"><section class="rings" id="rings" aria-label="Infusion set and sensor"></section></div>
     <div class="strip" id="strip"></div>
-    <div class="panel" id="weekPanel" hidden></div>
     <div class="panel" id="comingPanel">
       <div><h2>Coming days</h2><div class="muted">What's due this week, and the times his past data says to keep an eye on. Patterns from the last 14 days, not predictions.</div></div>
       <div class="twochart"><div class="mpcard"><h3>Coming up</h3><ul class="agenda" id="agenda"></ul></div><div class="mpcard"><h3>Be ready for</h3><ul class="plain" id="watchList"></ul></div></div>
@@ -106,7 +105,7 @@ img{max-width:100%}
       <a class="sick-link" href="#sick"><span>Unwell, or ketones high?</span><b>Open the sick-day guide →</b></a>
     </div>
     <div class="panel">
-      <h2>Recent</h2>
+      <div class="ph"><h2>Just logged</h2><a href="#log" class="see-all">See all</a></div>
       <ul class="log" id="recent"></ul>
     </div>
     </div>
@@ -198,6 +197,7 @@ img{max-width:100%}
       <div><h2>His typical day</h2><div class="muted">All the days in the period stacked on top of each other. The dark line is the middle value at each time of day. The shaded areas show how much it varies from day to day.</div></div>
       <div class="chartbox" id="agpChart"></div>
     </div>
+    <div class="panel" id="weekPanel" hidden></div>
     <div class="panel" id="bgPanel">
       <div class="ph"><h2>Blood glucose checks</h2><button type="button" class="small primary" data-q2="bg">Log a BG</button></div>
       <div class="muted" style="font-size:.9rem">Finger-prick readings from his pump/meter file and the ones you log here. Useful when the CGM and how he seems don't match.</div>
@@ -397,7 +397,7 @@ img{max-width:100%}
   <!-- SETUP CHECK -->
   <section id="v-setup" class="view" hidden>
     <div class="panel">
-      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end"><div><h2 id="setupScore">Setup</h2><div class="muted">Each line checks itself. Green means done. Tap a line that isn't green to go and fix it.</div></div><button type="button" class="small" id="setupRefresh">Check again</button></div>
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end"><div><h2 id="setupScore">Setup</h2><div class="muted">Only the one-time setup: sharing, safety and backups. Each line checks itself; tap one that isn't green to fix it.</div></div><button type="button" class="small" id="setupRefresh">Check again</button></div>
       <ul class="setup-list" id="setupList"></ul>
     </div>
     <div class="panel" id="pushPanel">
@@ -409,16 +409,13 @@ img{max-width:100%}
   <!-- BACKUP -->
   <section id="v-backup" class="view" hidden>
     <div class="panel" id="backupPanel">
-      <div><h2>Backup and restore</h2><div class="muted">Save everything (log, food, glucose data, growth, check-ups, supplies and care plan) as one file on your phone or computer. Keep a copy somewhere safe, like email or Google Drive.</div></div>
-      <div class="strip" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
-        <div class="stat" id="bkLast"><span class="k">Last backup</span><span class="v">—</span><span class="n">Never</span></div>
-        <div class="stat"><span class="k">Saved items</span><span class="v" id="bkCount">—</span><span class="n">Entries, days of CGM, records</span></div>
-      </div>
-      <div class="btns"><button class="primary" id="bkExport" type="button">Download backup</button><label class="btn" for="bkFile" style="display:inline-block">Restore from backup<input id="bkFile" type="file" accept=".json,.enc,.zip,application/json,application/zip" hidden></label></div>
+      <div class="bk-h"><span class="bk-ic" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg></span><div><h2>Save a copy to this phone</h2><p class="muted">One file with everything. Keep it in email or Google Drive.</p></div></div>
+      <p class="bk-line" id="bkLine">Not saved to a file yet</p>
+      <div class="btns"><button class="primary" id="bkExport" type="button">Download a copy</button><label class="btn" for="bkFile" style="display:inline-flex;align-items:center">Restore from a file<input id="bkFile" type="file" accept=".json,.enc,.zip,application/json,application/zip" hidden></label></div>
+      <p class="bk-note">Restoring shows what's in the file and asks first. It never deletes anything added since.</p>
       <div id="bkStatus" class="notice" hidden></div>
       <div id="bkConfirm" class="band high" hidden></div>
     </div>
-    <div class="panel"><h2>How restore works</h2><ul class="plain"><li><strong>Download backup</strong> saves one file with everything: log, food, glucose data, growth, check-ups, supplies and care plan.</li><li><strong>Restore from backup</strong> shows what's in the file and asks before changing anything. It adds back anything missing and resets matching items to the backup. It never deletes entries you've added since.</li><li>Use it to move from the test HTML file to the family app, to a new phone, or to recover after a mistake.</li></ul></div>
   </section>
 </div>
 
