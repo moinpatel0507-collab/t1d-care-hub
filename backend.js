@@ -102,7 +102,13 @@ function docRef(path) {
   const { col, id } = splitPath(path);
   return {
     id, path,
-    async get() { return snapDoc(col, id); },
+    async get() {
+      // photos are big, so they are not loaded with everything else: fetch one when it is asked for
+      if (col === 'photos' && !cache.has(key(col, id)) && supabase && familyId && !offline) {
+        try { const { data } = await supabase.from('records').select('data').eq('family_id', familyId).eq('collection', 'photos').eq('id', id).limit(1); if (data && data[0]) cache.set(key(col, id), data[0].data); } catch {}
+      }
+      return snapDoc(col, id);
+    },
     async set(data) { const prev = cache.get(key(col, id)); cache.set(key(col, id), JSON.parse(JSON.stringify(data))); notifySoon(); try { await writeRow(col, id, data); } catch (e) { prev ? cache.set(key(col, id), prev) : cache.delete(key(col, id)); notifySoon(); throw e; } },
     async update(data) { const merged = { ...(cache.get(key(col, id)) || {}), ...data }; return this.set(merged); },
     async delete() { const prev = cache.get(key(col, id)); cache.delete(key(col, id)); notifySoon(); try { await deleteRow(col, id); } catch (e) { if (prev) cache.set(key(col, id), prev); notifySoon(); throw e; } },
@@ -137,11 +143,12 @@ const db = { doc: docRef, collection: colRef };
 async function loadAll() {
   const fresh = new Map(); const page = 1000;
   for (let from = 0; ; from += page) {
-    const { data, error } = await supabase.from('records').select('collection,id,data').eq('family_id', familyId).range(from, from + page - 1);
+    const { data, error } = await supabase.from('records').select('collection,id,data').eq('family_id', familyId).neq('collection', 'photos').range(from, from + page - 1);
     if (error) throw error;
     data.forEach(r => fresh.set(key(r.collection, r.id), r.data));
     if (data.length < page) break;
   }
+  for (const [k, v] of cache) if (k.startsWith('photos/')) fresh.set(k, v);   // keep photos already opened
   applyQueue(fresh);
   cache.clear(); fresh.forEach((v, k) => cache.set(k, v)); notify();
 }

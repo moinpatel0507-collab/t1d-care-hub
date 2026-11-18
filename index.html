@@ -44,6 +44,7 @@ img{max-width:100%}
     <a href="#food" class="pri"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18M4.5 3v5a2.5 2.5 0 0 0 5 0V3M18 21V3c-2.2 0-3.5 3-3.5 7h3.5"/></svg><span>Food</span></a>
     <a href="#log" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg><span>History</span></a>
     <a href="#insulin" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 3.5l6 6M17.5 6.5l-9.5 9.5-3 1 1-3 9.5-9.5"/><path d="M5 19l-2 2M11 7l6 6"/></svg><span>Insulin</span></a>
+    <a href="#dayout" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="13" rx="2.5"/><path d="M9 7V5a3 3 0 0 1 6 0v2M4 12h16"/></svg><span>Day out</span></a>
     <div class="nav-group">His health</div>
     <a href="#appts" class="pri"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h3"/></svg><span class="l-long">Appointments</span><span class="l-short">Appts</span></a>
     <a href="#checks" class="sec"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11M10 20V5M16 20v-6M2 20h20"/><path d="M20 4v6M17 7h6"/></svg><span>Growth</span></a>
@@ -63,6 +64,7 @@ img{max-width:100%}
       <div class="sheet-group">Every day</div>
       <a href="#log"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg><span>History</span></a>
       <a href="#insulin"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 3.5l6 6M17.5 6.5l-9.5 9.5-3 1 1-3 9.5-9.5"/><path d="M5 19l-2 2M11 7l6 6"/></svg><span>Insulin</span></a>
+      <a href="#dayout"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="13" rx="2.5"/><path d="M9 7V5a3 3 0 0 1 6 0v2M4 12h16"/></svg><span>Day out</span></a>
       <div class="sheet-group">His health</div>
       <a href="#checks"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11M10 20V5M16 20v-6M2 20h20"/><path d="M20 4v6M17 7h6"/></svg><span>Growth</span></a>
       <a href="#sick"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 17.5v-6"/></svg><span>Sick day</span></a>
@@ -73,6 +75,7 @@ img{max-width:100%}
       <a href="#plan"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zM9 11h6M9 15h4"/></svg><span>Care plan</span></a>
       <a href="#backup"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg><span>Backup</span></a>
       <label class="night-sw"><span><b>Night mode at night</b><small>Dark from 9pm to 7am on this phone</small></span><input type="checkbox" id="nightAuto" role="switch"></label>
+      <div class="app-ver" aria-hidden="false">T1D Care Hub · Version <span class="ver-n"></span></div>
       <a href="#setup"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Setup check</span><b class="sh-badge" id="bdgSetup" hidden></b></a>
     </div>
   </div>
@@ -80,6 +83,7 @@ img{max-width:100%}
   <!-- TODAY -->
   <section id="v-today" class="view" hidden>
     <div id="hypoBanner" class="hypo-banner" hidden></div>
+    <a href="#sick" id="sickBanner" class="sick-banner" hidden></a>
     <button type="button" class="hypo-go" id="hypoGo"><span class="hg-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15M6 13l6 6 6-6"/></svg></span><span><b>He's low</b><small>Treatment steps and a 15-minute recheck</small></span></button>
     <section class="panel bgnow" id="bgNow" aria-label="Latest glucose"></section>
     <div class="today-top"><section class="rings" id="rings" aria-label="Infusion set and sensor"></section></div>
@@ -320,6 +324,7 @@ img{max-width:100%}
 
   <!-- SICK DAY -->
   <section id="v-sick" class="view" hidden>
+    <div class="panel" id="sickMode"></div>
     <div class="panel">
       <h2>Ketone check</h2>
       <div class="grid2">
@@ -399,6 +404,30 @@ img{max-width:100%}
     </form>
   </section>
 
+  <!-- DAY OUT -->
+  <section id="v-dayout" class="view" hidden>
+    <div class="panel">
+      <div class="ph"><h2>Where and when</h2><span class="muted" id="doSaved"></span></div>
+      <div class="grid2">
+        <label>Day<input id="do_date" type="date"></label>
+        <label>Where <small>optional</small><input id="do_where" placeholder="e.g. Grandma's, the zoo" autocomplete="off"></label>
+        <label>Leaving<input id="do_leave" type="time" value="09:00"></label>
+        <label>Back<input id="do_back" type="time" value="17:00"></label>
+      </div>
+      <div id="doHeads"></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><h2>Food and drink</h2><span class="muted" id="doTotals"></span></div>
+      <div class="btns"><button type="button" class="primary" id="doUsual">Add his usual meals</button><button type="button" id="doAdd">Add food or drink</button></div>
+      <ul class="do-list" id="doList"></ul>
+      <p class="bk-note">His own usual foods and times, to plan and pack. Not advice on what to feed him.</p>
+    </div>
+    <div class="panel">
+      <div class="ph"><h2>Pack the bag</h2><span class="muted" id="doPackCount"></span></div>
+      <ul class="do-pack" id="doPack"></ul>
+    </div>
+  </section>
+
   <!-- INSULIN -->
   <section id="v-insulin" class="view" hidden>
     <div class="panel">
@@ -461,11 +490,42 @@ img{max-width:100%}
       <label><span id="e_carbsLabel">Carbs <small>g</small></span><input id="e_carbs" type="number" step="1" min="0" inputmode="numeric"></label>
     </div>
     <datalist id="itemList"></datalist>
+    <details class="calc" id="carbCalc" data-for-calc>
+      <summary>Work out carbs from the packet</summary>
+      <div class="grid2">
+        <label>Carbs per 100 g <small>from the label</small><input id="c_per" type="number" step="0.1" min="0" inputmode="decimal" placeholder="e.g. 68"></label>
+        <label>Weight he had <small>g</small><input id="c_g" type="number" step="1" min="0" inputmode="numeric" placeholder="e.g. 30"></label>
+        <label>Left on the plate <small>g, optional</small><input id="c_left" type="number" step="1" min="0" inputmode="numeric" placeholder="0"></label>
+        <div class="calc-out" id="c_out" aria-live="polite">Fill in the first two</div>
+      </div>
+      <button type="button" class="small primary" id="c_use" disabled>Use this</button>
+    </details>
+    <div class="photo-row" data-for-photo>
+      <label class="btn small photo-btn" for="e_photo"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span id="e_photoLbl">Add photo</span><input id="e_photo" type="file" accept="image/*" capture="environment" hidden></label>
+      <img id="e_photoPrev" class="photo-prev" alt="Photo for this entry" hidden>
+      <button type="button" class="small" id="e_photoDel" hidden>Remove photo</button>
+    </div>
     <label class="check" id="e_favWrap" hidden><input type="checkbox" id="e_fav"> Add to his usual foods</label>
     <label><span id="e_noteLabel">What happened / what you did</span><textarea id="e_note"></textarea></label>
     <div class="btns" style="justify-content:flex-end"><button type="button" class="danger" id="dlgDelete" hidden style="margin-right:auto">Delete</button><button type="button" id="dlgCancel">Cancel</button><button class="primary" type="submit" id="dlgSave">Save</button></div>
   </form>
 </dialog>
+
+<dialog id="doDlg">
+  <form id="doForm" method="dialog">
+    <h2>Add to the day</h2>
+    <div class="grid2">
+      <label>Time<input id="di_time" type="time" required></label>
+      <label>Type<select id="di_kind"><option value="food">Food</option><option value="drink">Drink</option></select></label>
+      <label style="grid-column:1/-1">What<input id="di_name" list="itemList" autocomplete="off" required placeholder="e.g. Banana (half)"></label>
+      <label>Carbs <small>g</small><input id="di_carbs" type="number" min="0" step="1" inputmode="numeric"></label>
+      <label data-dk="drink" hidden>Amount <small>ml</small><input id="di_ml" type="number" min="0" step="10" inputmode="numeric"></label>
+    </div>
+    <div class="btns" style="justify-content:flex-end"><button type="button" id="diCancel">Cancel</button><button class="primary" type="submit">Add</button></div>
+  </form>
+</dialog>
+
+<dialog id="photoDlg" class="photo-dlg"><div class="hy-top"><h2>Photo</h2><button type="button" class="small" id="photoClose">Close</button></div><img id="photoImg" alt="Photo of the meal or label"><p id="photoMsg" class="muted"></p></dialog>
 
 <dialog id="hypoDlg" class="hypo-dlg" aria-labelledby="hyTitle">
   <div class="hy-top"><h2 id="hyTitle">He's low</h2><button type="button" class="small" id="hyClose">Close</button></div>

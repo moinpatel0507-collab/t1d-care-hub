@@ -15,7 +15,7 @@ let db = null, base = null, plan = {}, log = [], supplies = [];
 let canWrite = false, me = null, names = {}, userCap = null;
 
 /* ---------- views ---------- */
-const VIEWS = ["today","glucose","food","log","insulin","supplies","checks","appts","reports","sick","plan","backup","setup"];
+const VIEWS = ["today","glucose","food","log","insulin","dayout","supplies","checks","appts","reports","sick","plan","backup","setup"];
 function route(){
   const v = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "today";
   VIEWS.forEach(n => $("#v-"+n).hidden = n !== v); document.documentElement.dataset.view = v;
@@ -97,7 +97,7 @@ function renderHero(){ renderHeroRing(); try { $("#who").textContent = friendlyL
   const chips=[["Site",site.v.replace(" left",""),site.cls],["Carbs",t.carbs+" g",""],["Drinks",t.ml+" ml",""],["Last ate",lf?new Date(lf.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):"—",""],["Hypos 7d",String(wk),wk>=3?"warn":""]];
   $("#heroChips").innerHTML = chips.map(([k,v,c])=>`<div class="hchip ${c}"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>`).join("");
 }
-function renderAll(){ renderHero(); renderStrip(); renderRecent(); renderFood(); renderLog(); renderSupplies(); renderSick(); renderItems(); renderGlucose(); renderChecks(); renderBackup(); renderMealPatterns(); renderComing(); renderAppts(); renderDeliveries(); renderReport(); renderFavs(); renderWeek(); renderSetup(); renderBgNow(); renderBgChecks(); renderInsulin(); renderVial(); }
+function renderAll(){ renderHero(); renderStrip(); renderRecent(); renderFood(); renderLog(); renderSupplies(); renderSick(); renderItems(); renderGlucose(); renderChecks(); renderBackup(); renderMealPatterns(); renderComing(); renderAppts(); renderDeliveries(); renderReport(); renderFavs(); renderWeek(); renderSetup(); renderBgNow(); renderBgChecks(); renderInsulin(); renderVial(); renderSick2(); renderDayOut(); }
 const dayKey = ms => new Date(ms).toDateString();
 function dayTotals(key){ const es = log.filter(e => dayKey(e.at)===key && (e.type==="food"||e.type==="drink"));
   return { carbs: es.reduce((a,e)=>a+(e.carbs||0),0), ml: es.filter(e=>e.type==="drink").reduce((a,e)=>a+(e.ml||0),0), meals: es.filter(e=>e.type==="food").length, drinks: es.filter(e=>e.type==="drink").length, es }; }
@@ -114,7 +114,7 @@ function renderFood(){
   ].join("");
   $("#foodToday").innerHTML = t.es.length ? t.es.slice().reverse().map(e => `<div class="meal tap" data-ledit="${esc(e.id)}" role="button" tabindex="0" aria-label="Edit ${esc(e.item||TYPES[e.type].label)}">
       <span class="t">${new Date(e.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})}</span>
-      <div style="min-width:0;overflow-wrap:anywhere"><span class="chip ${TYPES[e.type].chip}">${e.type==="food"?esc(e.meal||"Food"):"Drink"}</span>${esc(e.item||"")}${e.type==="food"&&e.ate&&e.ate!=="All"?` <span class="muted">· ate ${esc(e.ate.toLowerCase())}</span>`:""}${e.note?`<div class="muted">${esc(e.note)}</div>`:""}</div>
+      <div style="min-width:0;overflow-wrap:anywhere"><span class="chip ${TYPES[e.type].chip}">${e.type==="food"?esc(e.meal||"Food"):"Drink"}</span>${esc(e.item||"")}${e.type==="food"&&e.ate&&e.ate!=="All"?` <span class="muted">· ate ${esc(e.ate.toLowerCase())}</span>`:""}${e.photo?` <button type="button" class="photo-chip" data-photo="${esc(e.id)}" aria-label="See photo">${'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>'}</button>`:""}${e.note?`<div class="muted">${esc(e.note)}</div>`:""}</div>
       <span class="c">${e.carbs!=null?e.carbs+" g":""}${e.type==="drink"&&e.ml!=null?`<div class="muted" style="font-size:.85rem">${e.ml} ml</div>`:""}</span></div>`).join("")
     : `<div class="empty">Nothing logged today. Tap Add food after his next meal or snack.</div>`;
   $("#foodWeek").innerHTML = [0,1,2,3,4,5,6].map(i => { const ms=Date.now()-i*864e5, d=dayTotals(dayKey(ms));
@@ -164,6 +164,7 @@ function entryHTML(e){
   if(e.ket!=null){ const b=ketBand(e.ket); bits.push(`<span class="chip ${b.c} num">ket ${e.ket.toFixed(1)}</span>`); }
   if(e.type==="food"||e.type==="drink"){ bits.push(`<strong>${esc(e.meal && e.type==="food" ? e.meal+": " : "")}${esc(e.item||"")}</strong>`); if(e.ate && e.ate!=="All") bits.push(`<span class="muted">ate ${esc(e.ate.toLowerCase())}</span>`); if(e.ml!=null) bits.push(`<span class="num">${e.ml} ml</span>`); }
   if(e.carbs!=null) bits.push(`<span class="num">${e.carbs} g</span> <span class="muted">carbs</span>`);
+  if(e.photo) bits.push(`<button type="button" class="photo-chip" data-photo="${esc(e.id)}" aria-label="See photo">${'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>'}</button>`);
   return `<li><time datetime="${new Date(e.at).toISOString()}" style="white-space:pre-line">${fmtShort(e.at)}</time>
     <div class="what"><span class="chip ${t.chip}">${t.label}</span>${bits.join(" ")}${e.note? `<div>${esc(e.note)}</div>`:""}${e.by? `<div class="muted" style="font-size:.8rem">Logged by ${e.by===me?"you":esc(names[e.by]||"his mum")}</div>`:""}</div>
     <div class="row-acts"><button class="small" data-ledit="${esc(e.id)}" ${canWrite?"":"disabled"}>Edit</button><button class="small danger" data-del="${esc(e.id)}" ${canWrite?"":"disabled"}>Delete</button></div></li>`;
@@ -421,6 +422,7 @@ function openEdit(id){
   editingId = id; $("#dlgTitle").textContent = "Edit " + TYPES[e.type].label.toLowerCase(); $("#dlgDelete").hidden = false;
   $("#e_at").value = toLocalInput(e.at);
   const put = (sel,v) => { if(v!=null && v!=="") $(sel).value = v; };
+  if(e.photo) loadPhoto(id).then(src => { if(editingId===id && photoData===undefined) showPhotoPrev(src); });
   put("#e_gl",e.gl); put("#e_ket",e.ket); put("#e_carbs",e.carbs); put("#e_item",e.item); put("#e_meal",e.meal); put("#e_ate",e.ate); put("#e_ml",e.ml); put("#e_note",e.note);
 }
 function openEntry(type, pre={}){
@@ -428,12 +430,14 @@ function openEntry(type, pre={}){
   if(!canWrite){ (toast("Saving isn't switched on here. Open the page in a browser (see the note at the top)"), $("#dbNote").scrollIntoView({behavior:"smooth",block:"center"})); return; }
   $("#entryForm").reset(); $("#e_type").value = type; $("#e_at").value = localNow();
   $("#dlgTitle").textContent = TYPES[type].label; setFields(type); $("#e_favWrap").hidden = true; $("#e_note").placeholder = "";
+  photoData = undefined; showPhotoPrev(null); $("#carbCalc").open = false; ["#c_per","#c_g","#c_left"].forEach(i=>$(i).value=""); calcCarbs();
   if(type==="food"){ const h=new Date().getHours(); $("#e_meal").value = h<10?"Breakfast":h<11.5?"Morning snack":h<14?"Lunch":h<16.5?"Afternoon snack":h<19?"Dinner":"Bedtime snack"; }
   if(pre.gl!=null) $("#e_gl").value = pre.gl; if(pre.ket!=null) $("#e_ket").value = pre.ket;
   dlg.showModal();
 }
 function setFields(type){
   document.querySelectorAll("#entryForm [data-for]").forEach(el => el.hidden = !el.dataset.for.split(" ").includes(type));
+  $("#carbCalc").hidden = type!=="food"; document.querySelector("[data-for-photo]").hidden = !(type==="food"||type==="drink");
   const fd = type==="food"||type==="drink";
   document.querySelectorAll("#e_gl,#e_ket").forEach(el => el.closest("label").hidden = fd);
   $("#e_itemLabel").textContent = type==="drink" ? "Drink" : "What he had";
@@ -462,11 +466,14 @@ $("#entryForm").addEventListener("submit", async ev => {
   try {
     if(editingId){
       const old = log.find(x=>x.id===editingId) || {};
-      const upd = {...old, ...e, by: old.by || me, editedBy: me, editedAt: Date.now()}; delete upd.id; Object.keys(upd).forEach(k => upd[k]===undefined && delete upd[k]);
+      const upd = {...old, ...e, by: old.by || me, editedBy: me, editedAt: Date.now()}; delete upd.id;
+      if(photoData!==undefined){ upd.photo = !!(await savePhoto(editingId).catch(()=>false)); } Object.keys(upd).forEach(k => upd[k]===undefined && delete upd[k]);
       await base.collection("log").doc(editingId).set(upd);
       editingId = null; dlg.close(); toast("Changes saved"); return;
     }
-    await base.collection("log").add(e);
+    if(photoData){ e.photo = true; }
+    const added = await base.collection("log").add(e);
+    if(photoData){ try { await savePhoto(added.id); } catch { toast("Saved, but the photo didn't upload"); } }
     if(e.type==="food"||e.type==="drink"){ const fv=findFav(e.item);
       if(fv) base.collection("foods").doc(fv.id).update({uses:(fv.uses||0)+1, lastUsed:Date.now()}).catch(()=>{});
       else if($("#e_fav").checked && e.item) base.collection("foods").add({name:e.item, kind:e.type, carbs:e.carbs, ml:e.ml??null, portion:"", uses:1, lastUsed:Date.now()}).catch(()=>{}); }
@@ -1286,6 +1293,177 @@ function applyNight(){
 $("#nightAuto")?.addEventListener("change", ev => { try { localStorage.setItem(NIGHT_KEY, ev.target.checked ? "on" : "off"); } catch {} applyNight(); toast(ev.target.checked ? "Night mode on from 9pm to 7am" : "Night mode off"); });
 applyNight(); setInterval(applyNight, 60000); document.addEventListener("visibilitychange", () => { if(!document.hidden) applyNight(); });
 
+
+/* ---------- version ---------- */
+const APP_VERSION = "4.1";
+document.querySelectorAll(".ver-n").forEach(e => e.textContent = APP_VERSION);
+{ const nav=$("#nav"); if(nav && !nav.querySelector(".app-ver")){ const d=document.createElement("div"); d.className="app-ver nav-ver"; d.textContent="Version "+APP_VERSION; nav.insertBefore(d, $("#moreBtn")); } }
+
+/* ---------- carb calculator (in the log dialog) ---------- */
+function calcCarbs(){
+  const per=num($("#c_per").value), g=num($("#c_g").value), left=num($("#c_left").value)||0;
+  const ok = per!=null && g!=null && g>0 && per>=0 && left<g;
+  const c = ok ? Math.round(per*(g-left)/100) : null;
+  $("#c_out").innerHTML = ok ? `<b>${c} g</b> carbs<small>${per} g per 100 g × ${g-left} g eaten</small>` : (left>=g && g ? "Left over can't be more than he had" : "Fill in the first two");
+  $("#c_use").disabled = !ok; return c;
+}
+["#c_per","#c_g","#c_left"].forEach(id => $(id).addEventListener("input", calcCarbs));
+$("#c_use").addEventListener("click", () => { const c=calcCarbs(); if(c==null) return; $("#e_carbs").value=c;
+  const per=num($("#c_per").value), g=num($("#c_g").value), left=num($("#c_left").value)||0;
+  const tag=`${g-left} g at ${per} g/100 g`; const n=$("#e_note"); if(!n.value.includes(tag)) n.value = (n.value?n.value+" · ":"") + tag;
+  $("#carbCalc").open=false; toast(`${c} g carbs filled in`); });
+
+/* ---------- food photo ---------- */
+let photoData = undefined;   // undefined = unchanged, null = removed, string = new
+async function shrinkImage(file, max=800, q=0.7){
+  const url = URL.createObjectURL(file);
+  try { const img = await new Promise((res, rej) => { const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=url; });
+    const r = Math.min(1, max/Math.max(img.width, img.height)); const c=document.createElement("canvas"); c.width=Math.round(img.width*r); c.height=Math.round(img.height*r);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); return c.toDataURL("image/jpeg", q); }
+  finally { URL.revokeObjectURL(url); }
+}
+function showPhotoPrev(src){ const im=$("#e_photoPrev"); im.hidden=!src; if(src) im.src=src; else im.removeAttribute("src"); $("#e_photoDel").hidden=!src; $("#e_photoLbl").textContent = src ? "Change photo" : "Add photo"; }
+$("#e_photo").addEventListener("change", async ev => { const f=ev.target.files[0]; ev.target.value=""; if(!f) return;
+  try { photoData = await shrinkImage(f); showPhotoPrev(photoData); } catch { toast("Couldn't read that photo"); } });
+$("#e_photoDel").addEventListener("click", () => { photoData = null; showPhotoPrev(null); });
+async function savePhoto(entryId){
+  if(photoData===undefined) return false;
+  const ref = base.collection("photos").doc(entryId);
+  if(photoData===null){ await ref.delete().catch(()=>{}); return false; }
+  await ref.set({img: photoData, at: Date.now(), by: me}); return true;
+}
+async function loadPhoto(entryId){ try { const s=await base.collection("photos").doc(entryId).get(); return s.exists ? s.data().img : null; } catch { return null; } }
+async function viewPhoto(entryId){
+  const d=$("#photoDlg"); $("#photoImg").removeAttribute("src"); $("#photoMsg").textContent="Loading…"; d.showModal();
+  const src=await loadPhoto(entryId); if(src){ $("#photoImg").src=src; $("#photoMsg").textContent=""; } else $("#photoMsg").textContent="That photo isn't available.";
+}
+document.addEventListener("click", ev => { const b=ev.target.closest("[data-photo]"); if(b){ ev.stopPropagation(); viewPhoto(b.dataset.photo); } }, true);
+$("#photoClose").addEventListener("click", () => $("#photoDlg").close());
+
+/* ---------- sick-day mode (shared by both phones) ---------- */
+let sick = {}; const SICK_EVERY = 2*36e5;
+function sickChecks(){ return sick.active ? log.filter(e=>e.at>=sick.start && (e.type==="ketones"||e.type==="bg"||e.ket!=null||e.gl!=null)) : []; }
+function sickNextDue(){ const c=sickChecks()[0]; return (c ? c.at : sick.start) + SICK_EVERY; }
+function renderSick2(){
+  const el=$("#sickMode"), bn=$("#sickBanner"); if(!el) return;
+  if(!sick.active){
+    el.className="panel sick-off";
+    el.innerHTML = `<div class="bk-h"><span class="bk-ic" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 17.5v-6"/></svg></span><div><h2>Sick-day mode</h2><p class="muted">When he's unwell: a reminder to check ketones and glucose every 2 hours, and one timeline for his team. Both phones see it.</p></div></div><div class="btns"><button type="button" class="primary" id="sickStart">Start sick-day mode</button></div>`;
+    $("#sickStart").onclick = async () => { if(!canWrite) return toast("Saving isn't switched on here"); try { await base.collection("meta").doc("sickday").set({active:true, start:Date.now(), by:me}); await base.collection("log").add({type:"ill", at:Date.now(), note:"Sick-day mode started", by:me, gl:null, ket:null, carbs:null}); toast("Sick-day mode on"); } catch { toast("Couldn't start. Try again"); } };
+    if(bn) bn.hidden = true; return;
+  }
+  const due=sickNextDue(), left=due-Date.now(), late=left<=0;
+  const tl = log.filter(e=>e.at>=sick.start).slice(0,40);
+  const hm = ms => `${Math.floor(ms/36e5)}:${String(Math.floor(ms%36e5/6e4)).padStart(2,"0")}`;
+  el.className = "panel sick-on" + (late?" late":"");
+  el.innerHTML = `<div class="sick-top"><div><span class="k">Sick-day mode · since ${whenText(sick.start)}</span><b>${late?"Check now":"Next check in "+hm(left)}</b><span class="muted">${late?"Ketones and glucose were due "+(left<-6e4?Math.round(-left/6e4)+" min ago":"now"):"Ketones and glucose every 2 hours"}</span></div></div>
+    <div class="btns"><button type="button" class="primary" data-q2s="ketones">Log ketones</button><button type="button" data-q2s="bg">Log BG</button><button type="button" data-q2s="drink">Log a drink</button></div>
+    <h3 style="margin:6px 0 0">Timeline</h3>
+    <ul class="log sick-tl">${tl.length?tl.map(entryHTML).join(""):`<li class="empty">Nothing logged yet.</li>`}</ul>
+    <div class="btns"><button type="button" id="sickEnd">He's better: end sick-day mode</button></div>`;
+  el.querySelectorAll("[data-q2s]").forEach(b => b.onclick = () => openEntry(b.dataset.q2s));
+  $("#sickEnd").onclick = async () => { try { await base.collection("meta").doc("sickday").set({active:false, start:sick.start, end:Date.now(), by:me}); await base.collection("log").add({type:"ill", at:Date.now(), note:"Sick-day mode ended", by:me, gl:null, ket:null, carbs:null}); toast("Sick-day mode ended"); } catch { toast("Couldn't end. Try again"); } };
+  if(bn){ bn.hidden=false; bn.className = "sick-banner"+(late?" late":""); bn.innerHTML = `<b>${late?"Sick day: check ketones and glucose now":"Sick day: next check in "+hm(left)}</b><span>Open</span>`; }
+}
+let sickBeeped = 0;
+setInterval(() => { if(!sick.active) return; renderSick2(); const due=sickNextDue(); if(Date.now()>=due && sickBeeped!==due){ sickBeeped=due; try { navigator.vibrate?.([300,150,300]); } catch {} try { hyBeep(); } catch {} } }, 30000);
+
+
+/* ---------- day out planner ---------- */
+let dayplans = {}, doCur = null, doTimer = null;
+const ymdLocal = ms => ymd(ms);
+const hm2min = t => { const [h,m]=(t||"0:0").split(":").map(Number); return h*60+(m||0); };
+const doDefaultDate = () => { const upcoming = Object.values(dayplans).filter(p=>p.date>=ymdLocal(Date.now())).sort((a,b)=>a.date<b.date?-1:1)[0]; return upcoming ? upcoming.date : ymdLocal(Date.now()+864e5); };
+function doPlan(){ const d=$("#do_date").value || doDefaultDate(); return dayplans[d] || {date:d, leave:"09:00", back:"17:00", where:"", items:[], packed:{}}; }
+function doSave(plan, quiet){
+  dayplans[plan.date]=plan; clearTimeout(doTimer);
+  doTimer = setTimeout(async () => { try { await base.collection("dayplans").doc(plan.date).set(plan); if(!quiet) { $("#doSaved").textContent="Saved"; setTimeout(()=>$("#doSaved").textContent="",1500); } } catch { toast("Couldn't save the plan"); } }, 400);
+}
+function doUsualMeals(plan){
+  const L=hm2min(plan.leave), B=hm2min(plan.back), from=Date.now()-30*864e5, by={};
+  log.filter(e=>e.type==="food" && e.at>=from && e.meal).forEach(e=>{ (by[e.meal] ||= []).push(e); });
+  const out=[];
+  for(const [meal, es] of Object.entries(by)){
+    if(es.length<2) continue;
+    const mins = Math.round(es.reduce((a,e)=>{ const d=new Date(e.at); return a+d.getHours()*60+d.getMinutes(); },0)/es.length/15)*15;
+    if(mins<L || mins>B) continue;
+    const cnt={}; es.forEach(e=>{ const k=(e.item||"").trim(); if(k) cnt[k]=(cnt[k]||0)+1; });
+    const item=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0]?.[0]; if(!item) continue;
+    const fv=findFav(item), last=es.filter(e=>e.item===item).pop();
+    out.push({id:Math.random().toString(36).slice(2,9), time:String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0"), kind:"food", name:item+(meal?"":""), meal, carbs: fv?.carbs ?? last?.carbs ?? null, done:false});
+  }
+  return out.sort((a,b)=>a.time<b.time?-1:1);
+}
+function doPackList(plan){
+  const hrs = Math.max(1,(hm2min(plan.back)-hm2min(plan.leave))/60);
+  const tx = P("hypoTx"), food = plan.items.filter(i=>i.kind==="food"), drinks = plan.items.filter(i=>i.kind==="drink");
+  const v=last("vial"), vialDue = v ? v.at+(num(plan.vialDays??P("vialDays"))??28)*864e5 : null;
+  const list = [
+    ["hypo", `Hypo treatment: enough for ${Math.ceil(hrs/3)+2} goes`, tx ? tx.split("\n")[0].slice(0,90) : "What his team told you to give (add it in Care plan)"],
+    ["meter", "Blood glucose meter, strips and finger pricker", "In case the CGM and how he seems don't match"],
+    ["ketone", "Ketone strips", "Usually the same meter"],
+    ["site", "Spare infusion set and reservoir", "In case it comes out"],
+    ["insulin", "Insulin", vialDue && vialDue < hm2min(plan.back)*6e4 + keyToMs(plan.date) ? "The opened one runs out today: bring a new one" : "A spare cartridge or vial"],
+    ["glucagon", "Glucagon", P("glucagon") || "Check it's in date"],
+    ["phone", "Phones charged, and the CGM app working", ""],
+  ];
+  if(hrs>=5) list.push(["sensor","Sensor overtape or patches",""]);
+  food.forEach(i=>list.push(["f-"+i.id, `${i.name}${i.carbs!=null?` (${i.carbs} g)`:""}`, `For ${i.time}`]));
+  drinks.forEach(i=>list.push(["d-"+i.id, `${i.name}${i.ml?` ${i.ml} ml`:""}`, `For ${i.time}`]));
+  list.push(["water","Water", ""]);
+  return list;
+}
+function doHeads(plan){
+  const start=keyToMs(plan.date)+hm2min(plan.leave)*6e4, end=keyToMs(plan.date)+hm2min(plan.back)*6e4, out=[];
+  const s=lastSite(); if(s){ const due=s.at+(num(plan.siteDays??P("siteDays"))??3)*864e5; if(due<=end) out.push(due<start?"Infusion set change is due before you leave: change it first":"Infusion set change falls during the day out: bring a spare and plan when"); }
+  const sn=last("sensor"); if(sn){ const due=sn.at+(num(P("sensorDays"))??10)*864e5; if(due<=end) out.push(due<start?"Sensor change is due before you leave":"Sensor change falls during the day out: bring a new sensor"); }
+  const v=last("vial"); if(v){ const due=v.at+(num(P("vialDays"))??28)*864e5; if(due<=end) out.push("Opened insulin reaches its last day: bring a new one"); }
+  document.querySelectorAll("#watchList li:not(.muted)").forEach(li=>out.push(li.textContent.trim()));
+  return out;
+}
+function renderDayOut(){
+  const box=$("#doList"); if(!box) return;
+  if(!$("#do_date").value) $("#do_date").value = doDefaultDate();
+  const plan=doPlan(); doCur=plan;
+  if(document.activeElement?.id!=="do_where") $("#do_where").value=plan.where||"";
+  if(document.activeElement?.id!=="do_leave") $("#do_leave").value=plan.leave||"09:00";
+  if(document.activeElement?.id!=="do_back") $("#do_back").value=plan.back||"17:00";
+  const H=doHeads(plan);
+  $("#doHeads").innerHTML = H.length ? `<div class="do-heads"><b>Heads up</b><ul class="plain">${H.map(h=>`<li>${esc(h)}</li>`).join("")}</ul></div>` : "";
+  const items=plan.items.slice().sort((a,b)=>a.time<b.time?-1:1);
+  const carbs=items.filter(i=>i.kind==="food").reduce((a,i)=>a+(i.carbs||0),0), ml=items.filter(i=>i.kind==="drink").reduce((a,i)=>a+(i.ml||0),0);
+  $("#doTotals").textContent = items.length ? `${carbs} g carbs${ml?` · ${ml} ml`:""}` : "";
+  box.innerHTML = items.length ? items.map(i=>`<li class="${i.done?"done":""}"><span class="do-t">${esc(i.time)}</span><span class="do-n"><span class="chip ${i.kind==="drink"?"drink":"food"}">${i.kind==="drink"?"Drink":esc(i.meal||"Food")}</span> ${esc(i.name)}</span><span class="do-c">${i.carbs!=null?i.carbs+" g":""}${i.ml?`<small>${i.ml} ml</small>`:""}</span>
+      <span class="do-acts">${i.done?`<span class="chip ok">Had it</span>`:`<button type="button" class="small primary" data-dohad="${i.id}">Had it</button>`}<button type="button" class="small" data-dodel="${i.id}" aria-label="Remove ${esc(i.name)}">Remove</button></span></li>`).join("")
+    : `<li class="empty">Nothing planned yet. Tap <b>Add his usual meals</b> to fill in what he usually has between ${esc(plan.leave)} and ${esc(plan.back)}.</li>`;
+  const pk=doPackList(plan), packed=plan.packed||{}; const n=pk.filter(([k])=>packed[k]).length;
+  $("#doPackCount").textContent = `${n} of ${pk.length} packed`;
+  $("#doPack").innerHTML = pk.map(([k,t,sub])=>`<li><label class="do-chk ${packed[k]?"on":""}"><input type="checkbox" data-dopack="${esc(k)}" ${packed[k]?"checked":""}><span><b>${esc(t)}</b>${sub?`<small>${esc(sub)}</small>`:""}</span></label></li>`).join("");
+}
+["#do_where","#do_leave","#do_back"].forEach(id => $(id).addEventListener("input", () => { const p=doPlan(); p.where=$("#do_where").value; p.leave=$("#do_leave").value||"09:00"; p.back=$("#do_back").value||"17:00"; doSave(p); renderDayOut(); }));
+$("#do_date").addEventListener("change", renderDayOut);
+let doPending = null;
+dlg.addEventListener("close", () => { const pd=doPending; if(!pd) return; doPending=null;
+  setTimeout(() => { if(log.some(e=>e.item===pd.name && e.at>=pd.t0)){ const p=dayplans[pd.date]; const it=p?.items.find(i=>i.id===pd.id); if(it){ it.done=true; doSave(p,true); renderDayOut(); toast("Logged and ticked off the plan"); } } }, 700); });
+$("#doUsual").addEventListener("click", () => { const p=doPlan(); const add=doUsualMeals(p).filter(n=>!p.items.some(i=>i.name===n.name && i.time===n.time));
+  if(!add.length) return toast("No usual meals found in that time. Log meals for a few days, or add them yourself");
+  p.items=[...p.items, ...add]; doSave(p); renderDayOut(); toast(`Added ${add.length} usual meal${add.length===1?"":"s"}`); });
+$("#doAdd").addEventListener("click", () => { $("#doForm").reset(); $("#di_time").value = doPlan().leave || "10:00"; doKind(); $("#doDlg").showModal(); });
+function doKind(){ document.querySelectorAll("[data-dk]").forEach(el=>el.hidden = el.dataset.dk!==$("#di_kind").value); }
+$("#di_kind").addEventListener("change", doKind);
+$("#di_name").addEventListener("change", () => { const fv=findFav($("#di_name").value); if(fv){ if($("#di_carbs").value==="" && fv.carbs!=null) $("#di_carbs").value=fv.carbs; if(fv.kind==="drink"){ $("#di_kind").value="drink"; doKind(); if(fv.ml!=null) $("#di_ml").value=fv.ml; } } });
+$("#diCancel").addEventListener("click", () => $("#doDlg").close());
+$("#doForm").addEventListener("submit", ev => { ev.preventDefault(); const p=doPlan();
+  p.items=[...p.items, {id:Math.random().toString(36).slice(2,9), time:$("#di_time").value, kind:$("#di_kind").value, name:$("#di_name").value.trim(), carbs:num($("#di_carbs").value), ml:$("#di_kind").value==="drink"?num($("#di_ml").value):null, done:false}];
+  doSave(p); $("#doDlg").close(); renderDayOut(); });
+document.addEventListener("click", ev => {
+  const h=ev.target.closest("[data-dohad]"); if(h){ const p=doPlan(), it=p.items.find(i=>i.id===h.dataset.dohad); if(!it) return;
+    openEntry(it.kind); $("#e_item").value=it.name; if(it.carbs!=null) $("#e_carbs").value=it.carbs; if(it.ml!=null) $("#e_ml").value=it.ml; if(it.meal && it.kind==="food") $("#e_meal").value=it.meal;
+    doPending = {date:p.date, id:it.id, name:it.name, t0:Date.now()-1000}; return; }
+  const d=ev.target.closest("[data-dodel]"); if(d){ const p=doPlan(); p.items=p.items.filter(i=>i.id!==d.dataset.dodel); doSave(p); renderDayOut(); }
+});
+document.addEventListener("change", ev => { const c=ev.target.closest("[data-dopack]"); if(!c) return; const p=doPlan(); p.packed={...(p.packed||{}), [c.dataset.dopack]: c.checked}; doSave(p,true); renderDayOut(); });
+
 /* ---------- weekly summary ---------- */
 function windowStats(fromMs, toMs){
   const pts=[]; for(let t=midnight(fromMs); t<toMs; t+=864e5) pts.push(...dayPoints(ymd(t)).filter(p=>p.t>=fromMs && p.t<toMs));
@@ -1397,7 +1575,7 @@ async function pushOff(){
 /* ===== design v3 helpers ===== */
 const VIEW_TITLES = {glucose:["Glucose","His CGM data, patterns and what they mean"], food:["Food & drink","Meals, drinks and how they affect his glucose"], log:["History","Everything you've logged, and the clinic summary"],
   supplies:["Supplies","Stock at home and the next delivery"], checks:["Growth & check-ups","Height, weight, eyes and teeth"], appts:["Appointments","GP, clinic, vaccinations and more"],
-  reports:["Reports","Round-ups to keep or share"], sick:["Sick day","What to do when he's unwell"], plan:["Care plan","His details, targets and contacts"], backup:["Backup","Keep a copy of everything"], setup:["Setup check","Is everything switched on and working?"], insulin:["Insulin","From his pump file: what the pump gave"]};
+  reports:["Reports","Round-ups to keep or share"], sick:["Sick day","What to do when he's unwell"], plan:["Care plan","His details, targets and contacts"], backup:["Backup","Keep a copy of everything"], setup:["Setup check","Is everything switched on and working?"], insulin:["Insulin","From his pump file: what the pump gave"], dayout:["Day out","Plan food, drinks and the bag before you go"]};
 for (const [k,[t,sub]] of Object.entries(VIEW_TITLES)) { const sec = document.getElementById("v-"+k); const ic = document.querySelector(`#nav a[href="#${k}"] .ic`); if(!sec || sec.querySelector(".view-head")) continue;
   const h = document.createElement("div"); h.className = "view-head"; h.innerHTML = `<span class="vh-ic">${ic?ic.outerHTML:""}</span><div><h1>${t}</h1><p>${sub}</p></div>`; sec.prepend(h); }
 function labelCardTables(){ document.querySelectorAll("table.cards").forEach(t => { const hs=[...t.querySelectorAll("thead th")].map(th=>th.textContent.trim()); t.querySelectorAll("tbody tr").forEach(tr => [...tr.children].forEach((td,i)=>{ if(hs[i] && !td.hasAttribute("colspan")) td.dataset.label = hs[i]; })); }); }
@@ -1538,6 +1716,7 @@ function renderComing(){
   supplyRows().forEach(sp=>{ if(!sp.days) return; const orderBy=now+Math.max(0,(sp.left-(sp.lead??14)))*864e5; add(orderBy, `Order ${sp.name} (${Math.floor(sp.left)} days left)`, sp.left<=(sp.lead??14)?"bad":"warn"); });
   ["eye","dental"].forEach(k=>{ const d=nextDue(k); if(d!=null && d<=now+30*864e5) items.push({at:d, text:`${CK[k].label} due`, cls:d<now?"bad":""}); });
   { const nd = nextDelivery(); if(nd){ const ob = nd - (num(delivery.lead) ?? 14)*864e5; add(ob, "Order / confirm supplies delivery", ob<now?"bad":"warn"); add(nd, "Supplies delivery due" + (delivery.who?" · "+delivery.who:"")); } }
+  if(typeof dayplans!=="undefined") Object.values(dayplans).forEach(pl=>{ const t=keyToMs(pl.date)+hm2min(pl.leave)*6e4; if(t>=midnight(now)) add(t, `Day out${pl.where?": "+pl.where:""} (${pl.items.length} food/drink planned)`, ""); });
   appts.filter(a=>a.status==="booked" && a.at>=midnight(now) && a.at<=horizon).forEach(a=>items.push({at:a.at, text:`${(AK[a.kind]||AK.other).label}${a.vaccine?" ("+a.vaccine+")":""}${a.hasTime?" at "+new Date(a.at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):""}${a.where?" · "+a.where:""}`, cls:""}));
   if(log.length>20 && (!lastBackup || now-lastBackup>30*864e5)) items.push({at:now, text:"Download a backup (Backup tab)", cls:"warn"});
   items.sort((a,b)=>a.at-b.at);
@@ -1717,7 +1896,7 @@ document.addEventListener("click", async ev => {
 
 
 /* ================= BACKUP ================= */
-const BK_COLS = ["log","cgm","pump","growth","checks","supplies","appts","foods"];
+const BK_COLS = ["log","cgm","pump","growth","checks","supplies","appts","foods","photos","dayplans"];
 let lastBackup = null, dl = null, fileBackupAt = null;
 function bkStatus(m){ const n=$("#bkStatus"); n.hidden=!m; n.textContent=m||""; }
 function renderBackup(){
@@ -1842,6 +2021,8 @@ renderAll();
   base.collection("appts").onSnapshot(s => { appts = s.docs.map(d => ({id:d.id, ...d.data()})); renderAppts(); renderChecks(); renderComing(); renderStrip(); ok(s); }, fail);
   base.collection("checks").onSnapshot(s => { checks = s.docs.map(d => ({id:d.id, ...d.data()})); renderChecks(); renderAppts(); renderStrip(); ok(s); }, fail);
   base.collection("meta").doc("delivery").onSnapshot(s => { delivery = s.exists ? s.data() : {}; renderDeliveries(); renderSupplies(); renderComing(); }, () => {});
+  base.collection("dayplans").onSnapshot(s => { dayplans = {}; s.docs.forEach(d => { const x=d.data(); if(x?.date) dayplans[x.date]=x; }); renderDayOut(); renderComing(); }, () => {});
+  base.collection("meta").doc("sickday").onSnapshot(s => { sick = s.exists ? s.data() : {}; renderSick2(); }, () => {});
   base.collection("meta").doc("filebackup").onSnapshot(s => { fileBackupAt = s.exists ? s.data().at : null; renderBackup(); }, () => {});
   base.collection("meta").doc("backup").onSnapshot(s => { lastBackup = s.exists ? s.data().at : null; renderBackup(); renderStrip(); }, () => {});
   base.collection("supplies").onSnapshot(s => { supplies = s.docs.map(d => ({id:d.id, ...d.data()})); renderAll(); ok(s); }, fail);

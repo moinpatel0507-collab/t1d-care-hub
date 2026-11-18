@@ -845,6 +845,7 @@ html[data-view="glucose"]{--page:#E11D48;--page-soft:#FFE4EA}
 html[data-view="food"]{--page:#16A34A;--page-soft:#E3F7EA}
 html[data-view="log"]{--page:#475467;--page-soft:#EAECF0}
 html[data-view="insulin"]{--page:#0369A1;--page-soft:#E0F0FB}
+html[data-view="dayout"]{--page:#C2410C;--page-soft:#FFEBDD}
 html[data-view="supplies"]{--page:#EA580C;--page-soft:#FFEDDF}
 html[data-view="checks"]{--page:#0D9488;--page-soft:#DDF6F2}
 html[data-view="appts"]{--page:#7C3AED;--page-soft:#EFE7FE}
@@ -931,6 +932,50 @@ html[data-view="today"] .hero h1{background:linear-gradient(90deg,#312E81,#6D28D
 :root[data-theme="dark"][data-view="today"] .hero h1{background:linear-gradient(90deg,#C7D2FE,#DDD6FE);-webkit-background-clip:text;background-clip:text}
 :root[data-theme="dark"] .panel,:root[data-theme="dark"] .ring-card,:root[data-theme="dark"] .stat{box-shadow:none!important}
 :root[data-theme="dark"] body{color-scheme:dark}
+
+/* ===== v4 · carb calculator, photo, sick-day mode, version ===== */
+.calc{background:var(--sunk);border-radius:16px;padding:4px 14px}
+.calc summary{min-height:44px;display:flex;align-items:center;font-weight:700;color:var(--accent);cursor:pointer;list-style:none}
+.calc summary::-webkit-details-marker{display:none}
+.calc[open]{padding-bottom:14px} .calc .grid2{margin-bottom:10px}
+.calc-out{display:flex;flex-direction:column;justify-content:center;font-size:14px;color:var(--muted)}
+.calc-out b{font:800 26px var(--display);color:var(--fg)} .calc-out small{font-size:12px}
+.photo-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.photo-btn{display:inline-flex!important;align-items:center;gap:6px;cursor:pointer}
+.photo-btn .ic{width:18px;height:18px}
+.photo-prev{width:64px;height:64px;object-fit:cover;border-radius:12px}
+.photo-chip{display:inline-grid;place-items:center;width:32px;height:32px;min-height:32px;padding:0;border-radius:10px;background:var(--accent-soft);color:var(--accent);vertical-align:middle;margin-left:4px}
+.photo-chip .ic{width:16px;height:16px}
+.photo-dlg{width:min(560px,calc(100vw - 16px))} .photo-dlg img{width:100%;border-radius:16px;display:block}
+.sick-on{background:linear-gradient(135deg,#DC2626,#B42318)!important;color:#fff}
+.sick-on.late{background:linear-gradient(135deg,#B42318,#7A271A)!important}
+.sick-on .k,.sick-on .muted{color:rgb(255 255 255 / .85)!important} .sick-on .k{font:700 12px var(--body);letter-spacing:.06em;text-transform:uppercase}
+.sick-top>div{display:flex;flex-direction:column;gap:2px} .sick-top b{font:800 30px var(--display)}
+.sick-on button.primary{background:#fff!important;color:#B42318!important} .sick-on button:not(.primary){background:rgb(255 255 255 / .18)!important;color:#fff!important}
+.sick-on h3{color:#fff} .sick-on .sick-tl button{background:var(--sunk)!important;color:var(--fg)!important} .sick-on .sick-tl button.danger{color:var(--muted)!important} .sick-on .sick-tl{background:var(--surface);color:var(--fg);border-radius:16px;padding:4px 12px}
+.sick-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-radius:18px;background:#DC2626;color:#fff;text-decoration:none;font-size:15px}
+.sick-banner span{font-size:13px;font-weight:700;opacity:.9} .sick-banner.late{background:#7A271A}
+.sick-banner[hidden]{display:none!important}
+#v-today>#sickBanner{order:1}
+.sheet-in .app-ver{order:99}
+.app-ver{font-size:12px;color:var(--muted);text-align:center;padding:12px 0 4px;font-weight:600}
+nav#nav .nav-ver{display:none}
+@media (min-width:1024px){ nav#nav .nav-ver{display:block;margin-top:auto;padding-top:16px} }
+
+/* ===== v4.1 · day out ===== */
+.do-heads{background:var(--high-soft);color:var(--fg);border-radius:16px;padding:12px 14px;display:grid;gap:4px}
+.do-heads b{color:var(--high)}
+.do-list,.do-pack{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.do-list li{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:6px 10px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.do-list li:first-child{border-top:0} .do-list li.empty{display:block;border:0}
+.do-list li.done .do-n,.do-list li.done .do-t{opacity:.55}
+.do-t{font-weight:800;font-size:15px} .do-c{font-weight:800;text-align:right;display:flex;flex-direction:column} .do-c small{font-weight:600;color:var(--muted)}
+.do-acts{grid-column:2/-1;display:flex;gap:8px;flex-wrap:wrap}
+.do-pack li{border-top:1px solid var(--line)} .do-pack li:first-child{border-top:0}
+.do-chk{display:flex;align-items:center;gap:12px;min-height:52px;padding:8px 2px;cursor:pointer;font-weight:400}
+.do-chk input{width:22px;height:22px;min-height:0;flex:none;accent-color:var(--page)}
+.do-chk span{display:flex;flex-direction:column} .do-chk b{font-weight:600} .do-chk small{color:var(--muted);font-size:13px}
+.do-chk.on b{text-decoration:line-through;color:var(--muted)}
 
 /* ===== sign-in & family setup (family app) ===== */
 #authGate{position:fixed;inset:0;z-index:100;background:var(--bg);overflow-y:auto;display:grid;place-items:start center;padding:max(24px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
